@@ -5,21 +5,24 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Image, Modal, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import * as Brightness from "expo-brightness";
 import * as Notifications from "expo-notifications";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { Directory, File, Paths } from "expo-file-system";
 import { WebView as RNWebView, type WebViewMessageEvent, type WebViewProps } from "react-native-webview";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  GestureDetector, GestureHandlerRootView, useExclusiveGestures, usePanGesture, usePinchGesture, useSimultaneousGestures, useTapGesture,
+} from "react-native-gesture-handler";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { Btn, OptionPicker, T } from "./components/ui";
+import { ensurePermission } from "./notifications";
+import { fonts, useColors } from "./theme";
 
 // react-native-webview's class typings clash with React 19's; describe just what we use.
 interface WebViewHandle { injectJavaScript: (js: string) => void }
 const WebView = RNWebView as unknown as React.ComponentType<WebViewProps & { ref?: React.Ref<WebViewHandle> }>;
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Btn, OptionPicker, T } from "./components/ui";
-import { ensurePermission } from "./notifications";
-import { fonts, useColors } from "./theme";
 
 export type PassKind = "gym" | "swim";
 interface Pass { image: string; pdf?: string; validTill: string; addedAt: string; reminderId?: string }
@@ -130,9 +133,10 @@ export function PassesProvider({ children }: { children: React.ReactNode }) {
     const dir = passDir();
     let image = "", pdf: string | undefined;
     if (source === "pdf") {
-      const res = await DocumentPicker.getDocumentAsync({ type: "application/pdf", copyToCacheDirectory: true });
+      // expo-file-system's own picker returns a File it's allowed to read; a DocumentPicker URI is rejected in Expo Go.
+      const res = await File.pickFileAsync({ mimeTypes: ["application/pdf"] });
       if (res.canceled) return "cancel";
-      const picked = new File(res.assets[0].uri);
+      const picked = res.result;
       const pdfFile = new File(dir, `${kind}-${stamp}.pdf`);
       picked.copySync(pdfFile);
       pdf = pdfFile.uri;
@@ -216,15 +220,85 @@ function PassViewer({ kind, pass, onClose }: { kind: PassKind | null; pass?: Pas
   if (!visible) return null;
   return (
     <Modal visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "#fff", paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }}>
+      {/* A Modal is a separate native window, so it needs its own gesture root. */}
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#fff", paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }}>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, marginBottom: 8 }}>
           <Text style={{ fontFamily: fonts.display, fontSize: 24, color: "#111", textTransform: "uppercase" }}>{LABEL[kind!]}</Text>
-          <Text style={{ fontFamily: fonts.bodyBold, color: "#555" }}>Tap to close</Text>
+          <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close pass">
+            <Text style={{ fontFamily: fonts.bodyBold, color: "#555" }}>Close ✕</Text>
+          </Pressable>
         </View>
-        <View style={{ paddingHorizontal: 16, marginBottom: 6 }}><Validity validTill={pass!.validTill} /></View>
-        <Image source={{ uri: pass!.image }} resizeMode="contain" style={{ flex: 1, width, maxHeight: height }} accessibilityLabel={LABEL[kind!]} />
-      </Pressable>
+        <View style={{ paddingHorizontal: 16, marginBottom: 6, gap: 2 }}>
+          <Validity validTill={pass!.validTill} />
+          <Text style={{ fontFamily: fonts.body, fontSize: 12, color: "#777" }}>Pinch or double-tap to zoom</Text>
+        </View>
+        <ZoomableImage uri={pass!.image} width={width} maxHeight={height} label={LABEL[kind!]} onTap={onClose} />
+      </GestureHandlerRootView>
     </Modal>
+  );
+}
+
+/* ---------- pinch / pan / double-tap zoom for just the pass image ---------- */
+const MAX_ZOOM = 5;
+const TAP_ZOOM = 2.5;
+
+function ZoomableImage({ uri, width, maxHeight, label, onTap }: { uri: string; width: number; maxHeight: number; label: string; onTap: () => void }) {
+  const scale = useSharedValue(1);
+  const startScale = useSharedValue(1);
+  const x = useSharedValue(0);
+  const y = useSharedValue(0);
+  const boxW = useSharedValue(width);
+  const boxH = useSharedValue(maxHeight);
+
+  // Keep the zoomed image covering the box, so it can't be dragged off-screen.
+  const clamp = (v: number, s: number, size: number) => {
+    "worklet";
+    const max = (size * (s - 1)) / 2;
+    return Math.min(max, Math.max(-max, v));
+  };
+
+  const pinch = usePinchGesture({
+    onBegin: () => { "worklet"; startScale.value = scale.value; },
+    onUpdate: (e) => {
+      "worklet";
+      scale.value = Math.min(MAX_ZOOM, Math.max(1, startScale.value * e.scale));
+      x.value = clamp(x.value, scale.value, boxW.value);
+      y.value = clamp(y.value, scale.value, boxH.value);
+    },
+  });
+  const pan = usePanGesture({
+    minPointers: 1,
+    onUpdate: (e) => {
+      "worklet";
+      x.value = clamp(x.value + e.changeX, scale.value, boxW.value);
+      y.value = clamp(y.value + e.changeY, scale.value, boxH.value);
+    },
+  });
+  const doubleTap = useTapGesture({
+    numberOfTaps: 2,
+    onActivate: () => {
+      "worklet";
+      const zoomIn = scale.value < 1.1;
+      scale.value = withTiming(zoomIn ? TAP_ZOOM : 1);
+      if (!zoomIn) { x.value = withTiming(0); y.value = withTiming(0); }
+    },
+  });
+  // A single tap closes the pass only when it isn't zoomed, so tapping around a zoomed pass is safe.
+  const singleTap = useTapGesture({
+    runOnJS: true,
+    onActivate: () => { if (scale.value <= 1.01) onTap(); },
+  });
+  const gesture = useSimultaneousGestures(pinch, pan, useExclusiveGestures(doubleTap, singleTap));
+
+  const style = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }, { translateY: y.value }, { scale: scale.value }] }));
+
+  return (
+    <GestureDetector gesture={gesture}>
+      <Animated.View style={{ flex: 1, overflow: "hidden" }}
+        onLayout={(e) => { boxW.value = e.nativeEvent.layout.width; boxH.value = e.nativeEvent.layout.height; }}>
+        <Animated.Image source={{ uri }} resizeMode="contain" style={[{ flex: 1, width, maxHeight }, style]} accessibilityLabel={label} />
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
@@ -243,7 +317,10 @@ function PassManager({ visible, onClose, passes, onAdd, onDelete, onValidTill, o
 
   const add = async (k: PassKind, s: "pdf" | "photo") => {
     setBusy(k); setMsg((m) => ({ ...m, [k]: "" }));
-    const err = await onAdd(k, s, newDate[k]).catch(() => "Something went wrong. Please try again.");
+    const err = await onAdd(k, s, newDate[k]).catch((e) => {
+      console.warn("Adding pass failed:", e);
+      return `Something went wrong. Please try again.${__DEV__ ? `\n(${String((e as Error)?.message ?? e)})` : ""}`;
+    });
     setBusy(null);
     if (err && err !== "cancel") setMsg((m) => ({ ...m, [k]: err }));
   };
