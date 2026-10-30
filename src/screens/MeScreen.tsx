@@ -104,7 +104,7 @@ export function MeScreen() {
               </View>
             </Row>
             <Row icon="ℹ️" title="About Iron Week" detail={`v${Constants.expoConfig?.version ?? "1.0.0"}`} open={open === "about"} onPress={() => flip("about")}>
-              <T variant="muted">Your gym and swim planner. Everything is saved only on this phone: no account, no server.</T>
+              <T variant="muted">Your gym and swim planner. Everything is saved only on this phone: no account, no server. Only two things use the internet: looking up a scanned barcode (Open Food Facts) and turning a pass PDF into an image.</T>
             </Row>
           </View>
         </View>

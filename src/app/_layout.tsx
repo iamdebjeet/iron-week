@@ -20,6 +20,7 @@ import { PassesProvider } from "../passes";
 import { scheduleReminders, scheduleSnack, setupCategories, setupChannels } from "../notifications";
 import { WaterSync } from "../water";
 import { ToastProvider } from "../toast";
+import { DraftProvider } from "../diet";
 import type { PlanDay } from "../data/types";
 import { pickQuote } from "../logic/quotes";
 import { isQuiet } from "../logic/time";
@@ -55,10 +56,12 @@ function Root() {
     <TimerProvider>
       <PassesProvider>
         <ToastProvider>
-          <StatusBar style={scheme === "dark" ? "light" : "dark"} />
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg } }} />
-          <BigTimer />
-          <WaterSync />
+          <DraftProvider>
+            <StatusBar style={scheme === "dark" ? "light" : "dark"} />
+            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg } }} />
+            <BigTimer />
+            <WaterSync />
+          </DraftProvider>
         </ToastProvider>
       </PassesProvider>
     </TimerProvider>

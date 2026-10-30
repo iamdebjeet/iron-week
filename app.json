@@ -47,11 +47,19 @@
         "expo-image-picker",
         {
           "photosPermission": "Iron Week uses your photos only when you choose a pass image to save on this phone.",
-          "cameraPermission": false,
+          "cameraPermission": "Iron Week uses the camera only to scan food barcodes. Pass photos come from your gallery.",
           "microphonePermission": false
         }
       ],
-      "expo-router"
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Iron Week uses the camera only to scan food barcodes.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "extra": {
       "eas": {

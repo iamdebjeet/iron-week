@@ -1,3 +1,3 @@
-import { DietScreen } from "../../screens/ComingSoon";
+import { DietScreen } from "../../screens/DietScreen";
 
 export default DietScreen;

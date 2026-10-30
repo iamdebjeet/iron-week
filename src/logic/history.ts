@@ -24,6 +24,8 @@ export interface DaySummary {
   prs?: number;
   /** Σ kg × reps of the ticked sets */
   volumeKg?: number;
+  /** What was eaten (as logged) */
+  diet?: { kcal: number; protein: number; carbs: number; fat: number; fibre: number; sodium: number };
 }
 export type History = Record<string, DaySummary>;
 

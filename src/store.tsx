@@ -5,6 +5,7 @@
 // - history: one summary per finished day, written when the day's ticks reset
 // - lifts: ticked sets with their kg, per exercise per date (also written at the day reset)
 // - bodyWeight: logged weights, one per date
+// - foods: custom and scanned foods, saved meals and recently used foods (today's log lives in daily)
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
 import type { ExerciseSetup, PlanDay, StretchSetup } from "./data/types";
@@ -14,11 +15,16 @@ import { type Lifts, addSessions, isBodyweight, prOf, sessionsFromTicks, volume 
 import { DEFAULT_WEEK, buildDays, type WeekSetup } from "./logic/plan";
 import { DEFAULT_PROFILE, type Profile } from "./logic/profile";
 import { DEFAULT_WATER, type WaterEntry, type WaterSettings } from "./logic/water";
+import { type DietEntry, type SavedMeal, sum } from "./logic/diet";
+import type { Food } from "./data/foods";
 import { KEYS, loadMany, migrate, save } from "./storage";
 
 interface Daily { date: string; ticks: Record<string, boolean>; swaps: Record<string, number>; quoteOffset?: number; water?: WaterEntry[]; waterSnooze?: number;
   /** kg per ticked-set id (bodyweight moves: added kg) */
-  kg?: Record<string, number> }
+  kg?: Record<string, number>;
+  diet?: DietEntry[] }
+export interface FoodLib { custom: Food[]; saved: SavedMeal[]; recents: string[] }
+const EMPTY_LIB: FoodLib = { custom: [], saved: [], recents: [] };
 export interface BodyEntry { date: string; kg: number }
 export type ThemePref = "system" | "light" | "dark";
 export interface Prefs {
@@ -70,6 +76,9 @@ interface Store {
   kg: Record<string, number>;
   lifts: Lifts;
   body: BodyEntry[];
+  /** Today's diet log */
+  diet: DietEntry[];
+  foodLib: FoodLib;
   setSetup: (key: string, s: ExerciseSetup | null) => void;
   setStretchSetup: (key: string, s: StretchSetup | null) => void;
   setTick: (id: string, on: boolean) => void;
@@ -87,12 +96,22 @@ interface Store {
   setKg: (tickId: string, kg: number | null) => void;
   /** Log today's body weight (also updates the profile) */
   logWeight: (kg: number) => void;
+  addDiet: (items: Omit<DietEntry, "id" | "at">[]) => void;
+  removeDiet: (id: string) => void;
+  addCustomFood: (f: Food) => void;
+  saveMeal: (m: Omit<SavedMeal, "id">) => void;
+  deleteSavedMeal: (id: string) => void;
 }
 
 const Ctx = createContext<Store | null>(null);
 const DEFAULT_PREFS: Prefs = { bigTimer: true, reminders: false, hour: 19, minute: 0, theme: "system", onboarded: false, waterReminders: true, lastBackup: null, backupReminder: false,
   timerAlerts: true, passAlerts: true, snackReminder: false, quietStart: 22 * 60 + 30, quietEnd: 7 * 60, water: DEFAULT_WATER,
   startDate: null, lightWeekSeen: 0,
+};
+
+const totals = (diet: DietEntry[]) => {
+  const t = sum(diet.map((e) => e.n));
+  return { kcal: t.kcal, protein: t.protein, carbs: t.carbs, fat: t.fat, fibre: t.fibre, sodium: t.sodium };
 };
 
 const freshDaily = (): Daily => ({ date: localDate(), ticks: {}, swaps: {} });
@@ -109,7 +128,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [history, setHistory] = useState<History>({});
   const [lifts, setLifts] = useState<Lifts>({});
   const [body, setBody] = useState<BodyEntry[]>([]);
+  const [foodLib, setFoodLib] = useState<FoodLib>(EMPTY_LIB);
   const plan = useMemo(() => buildDays(week), [week]);
+  const updateLib = useCallback((fn: (l: FoodLib) => FoodLib) => setFoodLib((l) => { const n = fn(l); save(KEYS.foods, n); return n; }), []);
 
   // What archiving a finished day needs, kept current for the midnight check.
   const ctx = useRef({ daily, setups, stretchSetups, plan, baseWaterMl: prefs.water.baseGoalMl });
@@ -127,7 +148,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const before = (prev[name] ?? []).filter((x) => x.date < s.date);
         return s.sets.some((set) => prOf(before, set, isBodyweight(name)));
       }).length;
-      const summary = { ...summarizeDay({ date: old.date, day, ticks: old.ticks, water: old.water ?? [], setups: c.setups, stretchSetups: c.stretchSetups, baseWaterMl: c.baseWaterMl }), prs, volumeKg: volume(sessions) };
+      const summary = { ...summarizeDay({ date: old.date, day, ticks: old.ticks, water: old.water ?? [], setups: c.setups, stretchSetups: c.stretchSetups, baseWaterMl: c.baseWaterMl }), prs, volumeKg: volume(sessions), diet: totals(old.diet ?? []) };
       setHistory((h) => { const n = addToHistory(h, summary); save(KEYS.history, n); return n; });
       const n = addSessions(prev, sessions); save(KEYS.lifts, n); return n;
     });
@@ -137,7 +158,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         await migrate();
-        const s = await loadMany([KEYS.setups, KEYS.stretch, KEYS.daily, KEYS.prefs, KEYS.profile, KEYS.week, KEYS.quotes, KEYS.history, KEYS.lifts, KEYS.body]);
+        const s = await loadMany([KEYS.setups, KEYS.stretch, KEYS.daily, KEYS.prefs, KEYS.profile, KEYS.week, KEYS.quotes, KEYS.history, KEYS.lifts, KEYS.body, KEYS.foods]);
         const loadedSetups = (s[KEYS.setups] ?? {}) as Record<string, ExerciseSetup>;
         const loadedStretch = (s[KEYS.stretch] ?? {}) as Record<string, StretchSetup>;
         setSetups(loadedSetups);
@@ -157,6 +178,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setHistory(loadedHistory);
         if (s[KEYS.lifts]) setLifts(s[KEYS.lifts] as Lifts);
         if (s[KEYS.body]) setBody(s[KEYS.body] as BodyEntry[]);
+        if (s[KEYS.foods]) setFoodLib({ ...EMPTY_LIB, ...(s[KEYS.foods] as Partial<FoodLib>) });
         const dl = s[KEYS.daily] as Daily | undefined;
         if (dl && dl.date === localDate()) setDaily(dl);
         else if (dl) {
@@ -192,7 +214,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<Store>(() => ({
     ready, today: daily.date, setups, stretchSetups, ticks: daily.ticks, swaps: daily.swaps, prefs, profile, week, plan, favQuotes, quoteOffset: daily.quoteOffset ?? 0,
-    water: daily.water ?? [], waterSnooze: daily.waterSnooze ?? null, history, kg: daily.kg ?? {}, lifts, body,
+    water: daily.water ?? [], waterSnooze: daily.waterSnooze ?? null, history, kg: daily.kg ?? {}, lifts, body, diet: daily.diet ?? [], foodLib,
     setSetup: (key, s) => setSetups((p) => { const n = { ...p }; if (s) n[key] = s; else delete n[key]; save(KEYS.setups, n); return n; }),
     setStretchSetup: (key, s) => setStretchSetups((p) => { const n = { ...p }; if (s) n[key] = s; else delete n[key]; save(KEYS.stretch, n); return n; }),
     setTick: (id, on) => updateDaily((d) => { const t = { ...d.ticks }; if (on) t[id] = true; else delete t[id]; return { ...d, ticks: t }; }),
@@ -208,12 +230,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     undoWater: () => updateDaily((d) => ({ ...d, water: (d.water ?? []).slice(0, -1) })),
     snoozeWater: (minutes) => updateDaily((d) => ({ ...d, waterSnooze: Date.now() + minutes * 60_000 })),
     setKg: (id, kg) => updateDaily((d) => { const k = { ...d.kg }; if (kg === null) delete k[id]; else k[id] = kg; return { ...d, kg: k }; }),
+    addDiet: (items) => {
+      const at = Date.now();
+      updateDaily((d) => ({ ...d, diet: [...(d.diet ?? []), ...items.map((x, i) => ({ ...x, id: `${at}-${i}`, at }))] }));
+      updateLib((l) => ({ ...l, recents: [...new Set([...items.map((x) => x.foodId).reverse(), ...l.recents])].slice(0, 15) }));
+    },
+    removeDiet: (id) => updateDaily((d) => ({ ...d, diet: (d.diet ?? []).filter((x) => x.id !== id) })),
+    addCustomFood: (f) => updateLib((l) => ({ ...l, custom: [f, ...l.custom.filter((x) => x.id !== f.id)] })),
+    saveMeal: (m) => updateLib((l) => ({ ...l, saved: [{ ...m, id: String(Date.now()) }, ...l.saved] })),
+    deleteSavedMeal: (id) => updateLib((l) => ({ ...l, saved: l.saved.filter((x) => x.id !== id) })),
     logWeight: (kg) => {
       const date = localDate();
       setBody((prev) => { const n = [...prev.filter((e) => e.date !== date), { date, kg }].sort((a, b) => (a.date < b.date ? -1 : 1)); save(KEYS.body, n); return n; });
       setProfileState((prev) => { const n = { ...prev, weightKg: kg }; save(KEYS.profile, n); return n; });
     },
-  }), [ready, setups, stretchSetups, daily, prefs, profile, week, plan, favQuotes, history, lifts, body, updateDaily]);
+  }), [ready, setups, stretchSetups, daily, prefs, profile, week, plan, favQuotes, history, lifts, body, foodLib, updateDaily, updateLib]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
