@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { STRETCHES, STRETCH_PLANS } from "../data/stretches";
 import { SWIM_BLOCKS } from "../data/swim";
 import type { PlanDay } from "../data/types";
-import { FULL_DAY, groupMinutes, normalizeSetup, stretchSetup, stretchSteps, stretchTickBase, todayKey } from "../logic";
+import { DAY_ORDER, FULL_DAY, groupMinutes, localDate, normalizeSetup, stretchSetup, stretchSteps, stretchTickBase, todayKey } from "../logic";
 import { useStore } from "../store";
 import { useTimer } from "../timer";
 import { ShowPassButton } from "../passes";
@@ -13,6 +13,10 @@ import { fonts, useColors } from "../theme";
 import { ExerciseCard, FinisherCard, StretchCard, SwimCard } from "../components/Cards";
 import { MusclesWorked, WeeklyOverview } from "../components/Panels";
 import { SessionChip } from "../components/TimerViews";
+import { QuoteCard } from "../components/QuoteCard";
+import { useNow } from "../hooks/useNow";
+import { contextLine, pickQuote, type QuoteContext } from "../logic/quotes";
+import { isGymMode } from "../logic/time";
 import { Btn, T } from "../components/ui";
 
 type View3 = "workout" | "stretch" | "swim";
@@ -23,9 +27,10 @@ const greeting = (hour: number) => (hour < 12 ? "Good morning" : hour < 17 ? "Go
 export function TodayScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
-  const { setups, stretchSetups, ticks, resetDay, plan, profile } = useStore();
+  const { setups, stretchSetups, ticks, resetDay, plan, profile, week, favQuotes, toggleFavQuote, quoteOffset, nextQuote } = useStore();
   const timer = useTimer();
-  const [hour] = useState(() => new Date().getHours());
+  const now = useNow();
+  const hour = now.getHours();
   const [dayKey, setDayKey] = useState(todayKey());
   const [view, setView] = useState<View3>("workout");
   const [opened, setOpened] = useState<Record<string, boolean>>({});
@@ -38,6 +43,13 @@ export function TodayScreen() {
   const v = views.includes(view) ? view : views[0];
 
   useEffect(() => () => { if (resetTimer.current) clearTimeout(resetTimer.current); }, []);
+
+  // Quote and gym mode are about today (not the day tab being looked at).
+  const today = plan.find((d) => d.key === DAY_ORDER[now.getDay()])!;
+  // Streak, missed-day and PR context arrive with the daily history (Progress phase); 0 / false until then.
+  const qctx: QuoteContext = { day: today, streak: 0, missedYesterday: false, prYesterday: false };
+  const quote = pickQuote(localDate(now), qctx, quoteOffset);
+  const gymMode = isGymMode(now, today, week.gymStart, week.swimStart, timer.session.running);
 
   const isOpen = (id: string, auto: boolean) => (id in opened ? opened[id] : auto);
   const toggle = (id: string, cur: boolean) => setOpened((o) => ({ ...o, [id]: !cur }));
@@ -112,6 +124,9 @@ export function TodayScreen() {
             <T variant="display" style={{ fontSize: 34 }}>{FULL_DAY[day.key]}</T>
           </View>
           <SessionChip />
+        </View>
+        <View style={{ marginTop: 12 }}>
+          <QuoteCard quote={quote} context={contextLine(qctx)} saved={favQuotes.includes(quote.id)} onSave={() => toggleFavQuote(quote.id)} onAnother={nextQuote} slim={gymMode} />
         </View>
 
         {/* Day tabs */}

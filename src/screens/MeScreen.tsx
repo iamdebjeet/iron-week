@@ -9,7 +9,7 @@ import { EXPERIENCE_LABEL, GOAL_LABEL, bmi } from "../logic/profile";
 import { usePasses } from "../passes";
 import { type ThemePref, useStore } from "../store";
 import { fonts, useColors } from "../theme";
-import { MusicButtons, SettingsSheet } from "../components/Panels";
+import { MusicButtons } from "../components/Panels";
 import { Btn, T } from "../components/ui";
 
 const time12 = (h: number, m: number) => `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
@@ -38,9 +38,8 @@ function Row({ icon, title, detail, onPress, soon, open, children }: {
 export function MeScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
-  const { prefs, setPrefs, profile, plan } = useStore();
+  const { prefs, setPrefs, profile, plan, favQuotes } = useStore();
   const { passes, openManager } = usePasses();
-  const [notif, setNotif] = useState(false);
   const [open, setOpen] = useState<"music" | "theme" | "about" | null>(null);
   const flip = (k: typeof open) => setOpen((o) => (o === k ? null : k));
   const b = bmi(profile);
@@ -84,12 +83,12 @@ export function MeScreen() {
           <View style={{ marginTop: -1 }}>
             <Row icon="🎫" title="Entry passes" detail={passInfo} onPress={openManager} />
             <Row icon="📅" title="My week" detail={weekInfo} onPress={() => router.push("/week")} />
-            <Row icon="🔔" title="Notifications" detail={prefs.reminders ? `Daily ${time12(prefs.hour, prefs.minute)}` : "Off"} onPress={() => setNotif(true)} />
+            <Row icon="🔔" title="Notifications" detail={prefs.reminders ? `Daily ${time12(prefs.hour, prefs.minute)}` : "Daily off"} onPress={() => router.push("/notifications")} />
             <Row icon="🎯" title="Goals" soon />
             <Row icon="🎵" title="Music" detail="Spotify · YouTube Music" open={open === "music"} onPress={() => flip("music")}>
               <MusicButtons />
             </Row>
-            <Row icon="❝" title="Saved quotes" soon />
+            <Row icon="❝" title="Saved quotes" detail={favQuotes.length ? `${favQuotes.length} saved` : "None yet"} onPress={() => router.push("/quotes")} />
             <Row icon="💾" title="Backup / restore" detail={prefs.lastBackup ? `Last: ${new Date(prefs.lastBackup).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : "Never"} onPress={() => router.push("/backup")} />
             <Row icon="🌗" title="Theme" detail={THEMES.find((x) => x.key === prefs.theme)?.label} open={open === "theme"} onPress={() => flip("theme")}>
               <View style={{ flexDirection: "row", borderWidth: 1, borderColor: c.line, borderRadius: 10, overflow: "hidden" }}>
@@ -110,7 +109,6 @@ export function MeScreen() {
           </View>
         </View>
       </ScrollView>
-      <SettingsSheet visible={notif} onClose={() => setNotif(false)} />
     </View>
   );
 }

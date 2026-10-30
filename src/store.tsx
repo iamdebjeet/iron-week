@@ -10,7 +10,7 @@ import { DEFAULT_WEEK, buildDays, type WeekSetup } from "./logic/plan";
 import { DEFAULT_PROFILE, type Profile } from "./logic/profile";
 import { KEYS, loadMany, migrate, save } from "./storage";
 
-interface Daily { date: string; ticks: Record<string, boolean>; swaps: Record<string, number> }
+interface Daily { date: string; ticks: Record<string, boolean>; swaps: Record<string, number>; quoteOffset?: number }
 export type ThemePref = "system" | "light" | "dark";
 export interface Prefs {
   bigTimer: boolean; reminders: boolean; hour: number; minute: number; theme: ThemePref;
@@ -21,6 +21,14 @@ export interface Prefs {
   lastBackup: string | null;
   /** Monthly "Back up your data" reminder */
   backupReminder: boolean;
+  /** Alerts when a rest / stretch / swim step ends */
+  timerAlerts: boolean;
+  passAlerts: boolean;
+  /** "Pre-gym snack" 90 min before the gym on gym days */
+  snackReminder: boolean;
+  /** Quiet hours in minutes after midnight (no reminders; timers still alert while a session runs) */
+  quietStart: number;
+  quietEnd: number;
 }
 
 interface Store {
@@ -34,6 +42,10 @@ interface Store {
   week: WeekSetup;
   /** The 7 days Mon–Sun built from `week` */
   plan: PlanDay[];
+  /** Saved quote ids, newest first */
+  favQuotes: string[];
+  /** "↻ another" presses today */
+  quoteOffset: number;
   setSetup: (key: string, s: ExerciseSetup | null) => void;
   setStretchSetup: (key: string, s: StretchSetup | null) => void;
   setTick: (id: string, on: boolean) => void;
@@ -42,10 +54,14 @@ interface Store {
   setPrefs: (p: Partial<Prefs>) => void;
   setProfile: (p: Partial<Profile>) => void;
   setWeek: (w: Partial<WeekSetup>) => void;
+  toggleFavQuote: (id: string) => void;
+  nextQuote: () => void;
 }
 
 const Ctx = createContext<Store | null>(null);
-const DEFAULT_PREFS: Prefs = { bigTimer: true, reminders: false, hour: 19, minute: 0, theme: "system", onboarded: false, waterReminders: true, lastBackup: null, backupReminder: false };
+const DEFAULT_PREFS: Prefs = { bigTimer: true, reminders: false, hour: 19, minute: 0, theme: "system", onboarded: false, waterReminders: true, lastBackup: null, backupReminder: false,
+  timerAlerts: true, passAlerts: true, snackReminder: false, quietStart: 22 * 60 + 30, quietEnd: 7 * 60,
+};
 
 const freshDaily = (): Daily => ({ date: localDate(), ticks: {}, swaps: {} });
 
@@ -57,6 +73,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [prefs, setPrefsState] = useState<Prefs>(DEFAULT_PREFS);
   const [profile, setProfileState] = useState<Profile>(DEFAULT_PROFILE);
   const [week, setWeekState] = useState<WeekSetup>(DEFAULT_WEEK);
+  const [favQuotes, setFavQuotes] = useState<string[]>([]);
   const dailyRef = useRef(daily);
   useEffect(() => { dailyRef.current = daily; }, [daily]);
 
@@ -64,7 +81,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         await migrate();
-        const s = await loadMany([KEYS.setups, KEYS.stretch, KEYS.daily, KEYS.prefs, KEYS.profile, KEYS.week]);
+        const s = await loadMany([KEYS.setups, KEYS.stretch, KEYS.daily, KEYS.prefs, KEYS.profile, KEYS.week, KEYS.quotes]);
         if (s[KEYS.setups]) setSetups(s[KEYS.setups] as Record<string, ExerciseSetup>);
         if (s[KEYS.stretch]) setStretchSetups(s[KEYS.stretch] as Record<string, StretchSetup>);
         const dl = s[KEYS.daily] as Daily | undefined;
@@ -72,6 +89,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (s[KEYS.prefs]) setPrefsState({ ...DEFAULT_PREFS, ...(s[KEYS.prefs] as Partial<Prefs>) });
         if (s[KEYS.profile]) setProfileState({ ...DEFAULT_PROFILE, ...(s[KEYS.profile] as Partial<Profile>) });
         const w = s[KEYS.week] as Partial<WeekSetup> | undefined;
+        const q = s[KEYS.quotes] as { favourites?: string[] } | undefined;
+        if (q?.favourites) setFavQuotes(q.favourites);
         if (w) setWeekState({ ...DEFAULT_WEEK, ...w, days: { ...DEFAULT_WEEK.days, ...w.days }, order: w.order ?? {} });
       } catch {}
       setReady(true);
@@ -93,7 +112,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const plan = useMemo(() => buildDays(week), [week]);
 
   const value = useMemo<Store>(() => ({
-    ready, setups, stretchSetups, ticks: daily.ticks, swaps: daily.swaps, prefs, profile, week, plan,
+    ready, setups, stretchSetups, ticks: daily.ticks, swaps: daily.swaps, prefs, profile, week, plan, favQuotes, quoteOffset: daily.quoteOffset ?? 0,
     setSetup: (key, s) => setSetups((p) => { const n = { ...p }; if (s) n[key] = s; else delete n[key]; save(KEYS.setups, n); return n; }),
     setStretchSetup: (key, s) => setStretchSetups((p) => { const n = { ...p }; if (s) n[key] = s; else delete n[key]; save(KEYS.stretch, n); return n; }),
     setTick: (id, on) => updateDaily((d) => { const t = { ...d.ticks }; if (on) t[id] = true; else delete t[id]; return { ...d, ticks: t }; }),
@@ -102,7 +121,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setPrefs: (p) => setPrefsState((prev) => { const n = { ...prev, ...p }; save(KEYS.prefs, n); return n; }),
     setProfile: (p) => setProfileState((prev) => { const n = { ...prev, ...p }; save(KEYS.profile, n); return n; }),
     setWeek: (w) => setWeekState((prev) => { const n = { ...prev, ...w }; save(KEYS.week, n); return n; }),
-  }), [ready, setups, stretchSetups, daily, prefs, profile, week, plan, updateDaily]);
+    toggleFavQuote: (id) => setFavQuotes((prev) => { const n = prev.includes(id) ? prev.filter((x) => x !== id) : [id, ...prev]; save(KEYS.quotes, { favourites: n }); return n; }),
+    nextQuote: () => updateDaily((d) => ({ ...d, quoteOffset: (d.quoteOffset ?? 0) + 1 })),
+  }), [ready, setups, stretchSetups, daily, prefs, profile, week, plan, favQuotes, updateDaily]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

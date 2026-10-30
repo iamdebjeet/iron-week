@@ -6,6 +6,7 @@ import { AppState, Vibration } from "react-native";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import type { TimerStep } from "./data/types";
 import { cancelIds, ensurePermission, scheduleStepAlerts } from "./notifications";
+import { isQuiet, minutesOf } from "./logic/time";
 import { useStore } from "./store";
 
 interface Run { steps: TimerStep[]; ends: number[]; index: number; doneText: string; doneLabel: string }
@@ -64,12 +65,21 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const [sessionLeft, setSessionLeft] = useState(SESSION);
   const sessionIds = useRef<string[]>([]);
 
+  // Step alerts follow Me → Notifications: off when "Workout timers" is off, and silent in quiet hours
+  // unless the session timer is running (a session in progress always gets its alerts).
+  const alertRules = useRef({ on: prefs.timerAlerts, quietStart: prefs.quietStart, quietEnd: prefs.quietEnd, session: false });
+  useEffect(() => {
+    alertRules.current = { on: prefs.timerAlerts, quietStart: prefs.quietStart, quietEnd: prefs.quietEnd, session: !!sessionEnd };
+  }, [prefs.timerAlerts, prefs.quietStart, prefs.quietEnd, sessionEnd]);
+
   const reschedule = useCallback(async () => {
     const ids = alertIds.current;
     alertIds.current = [];
     await cancelIds(ids);
     const r = runRef.current;
-    if (!r || !(await ensurePermission())) return;
+    const rules = alertRules.current;
+    if (!r || !rules.on || (isQuiet(minutesOf(new Date()), rules) && !rules.session)) return;
+    if (!(await ensurePermission())) return;
     const pending = r.steps.slice(r.index).map((s, i) => ({ label: s.label, endsAt: r.ends[r.index + i] }));
     alertIds.current = await scheduleStepAlerts(pending);
   }, []);

@@ -1,4 +1,5 @@
-// Local notifications: timer alerts that fire even when the phone is locked, and daily gym/swim reminders.
+// Local notifications: timer alerts that fire even when the phone is locked, daily gym/swim reminders,
+// pass expiry, pre-gym snack and backup reminders. Each kind is tagged in data.kind so it can be replaced on its own.
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import type { PlanDay } from "./data/types";
@@ -66,35 +67,62 @@ export async function cancelIds(ids: string[]) {
 }
 
 const WEEKDAY: Record<string, number> = { sun: 1, mon: 2, tue: 3, wed: 4, thu: 5, fri: 6, sat: 7 };
+const DAY_OF_WEEK = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
-/** Replace all daily reminders. Pass enabled=false to just remove them. */
-export async function scheduleReminders(enabled: boolean, hour: number, minute: number, days: PlanDay[]) {
+/** Cancel every scheduled notification of one kind */
+export async function cancelKind(kind: string) {
   const all = await Notifications.getAllScheduledNotificationsAsync();
   await Promise.all(
-    all
-      .filter((n) => (n.content.data as { kind?: string } | undefined)?.kind === "reminder")
+    all.filter((n) => (n.content.data as { kind?: string } | undefined)?.kind === kind)
       .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
   );
+}
+
+const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** How many days ahead daily reminders are scheduled; opening the app tops them up again. */
+const REMINDER_DAYS = 14;
+
+/**
+ * Replace all daily reminders: one dated notification per day for the next 14 days, each with that day's quote.
+ * Pass enabled=false to just remove them.
+ */
+export async function scheduleReminders(enabled: boolean, hour: number, minute: number, days: PlanDay[], quoteFor?: (date: string, day: PlanDay) => string) {
+  await cancelKind("reminder");
   if (!enabled) return;
-  for (const d of days) {
+  const now = new Date();
+  for (let i = 0; i < REMINDER_DAYS; i++) {
+    const when = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i, hour, minute);
+    if (when.getTime() <= now.getTime()) continue;
+    const d = days.find((x) => x.key === DAY_OF_WEEK[when.getDay()]);
+    if (!d) continue;
     const title = d.rest ? (d.swim ? "Today: Recovery swim" : "Today: Rest day") : `Today: ${d.title}${d.swim ? " + Swim" : ""}`;
-    const body = d.rest
+    const plan = d.rest
       ? d.swim ? "No gym today. Easy swim, then the recovery stretches." : "No gym or swim today. Rest well; the recovery stretches are there if you want them."
       : d.exercises.slice(0, 3).map((e) => e.name).join(", ") + "… Open Iron Week to start.";
+    const quote = quoteFor?.(iso(when), d);
     await Notifications.scheduleNotificationAsync({
-      content: { title, body, data: { kind: "reminder" } },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday: WEEKDAY[d.key], hour, minute, channelId: REMINDER_CHANNEL },
+      content: { title, body: quote ? `${plan}\n❝ ${quote}` : plan, data: { kind: "reminder" } },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: when, channelId: REMINDER_CHANNEL },
+    });
+  }
+}
+
+/** "Pre-gym snack" 90 minutes before the gym, every gym day (weekly). Skipped if that time is in quiet hours. */
+export async function scheduleSnack(enabled: boolean, days: PlanDay[], gymStart: number, quiet: (minute: number) => boolean) {
+  await cancelKind("snack");
+  const at = gymStart - 90;
+  if (!enabled || at < 0 || quiet(at)) return;
+  for (const d of days.filter((x) => !x.rest)) {
+    await Notifications.scheduleNotificationAsync({
+      content: { title: "Pre-gym snack 🍌", body: "Gym in 90 minutes. A banana, a bowl of curd or a peanut-butter toast keeps you going.", data: { kind: "snack" } },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday: WEEKDAY[d.key], hour: Math.floor(at / 60), minute: at % 60, channelId: REMINDER_CHANNEL },
     });
   }
 }
 
 /** Monthly nudge to back up: 30 days after the last backup (or from now if there's none), at 10 AM. */
 export async function scheduleBackupReminder(enabled: boolean, lastBackup: string | null) {
-  const all = await Notifications.getAllScheduledNotificationsAsync();
-  await Promise.all(
-    all.filter((n) => (n.content.data as { kind?: string } | undefined)?.kind === "backup")
-      .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
-  );
+  await cancelKind("backup");
   if (!enabled) return;
   const when = lastBackup ? new Date(lastBackup) : new Date();
   when.setDate(when.getDate() + 30);

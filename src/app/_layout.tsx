@@ -17,14 +17,17 @@ import { ReloadProvider } from "../reload";
 import { StoreProvider, useStore } from "../store";
 import { TimerProvider } from "../timer";
 import { PassesProvider } from "../passes";
-import { scheduleReminders, setupChannels } from "../notifications";
+import { scheduleReminders, scheduleSnack, setupChannels } from "../notifications";
+import type { PlanDay } from "../data/types";
+import { pickQuote } from "../logic/quotes";
+import { isQuiet } from "../logic/time";
 import { useColors } from "../theme";
 import { BigTimer } from "../components/TimerViews";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function Root() {
-  const { ready, prefs, plan } = useStore();
+  const { ready, prefs, plan, week } = useStore();
   const c = useColors();
   const scheme = useColorScheme();
   const [fontsLoaded] = useFonts({ Barlow_400Regular, Barlow_500Medium, Barlow_600SemiBold, BarlowCondensed_700Bold, BarlowCondensed_800ExtraBold });
@@ -33,10 +36,18 @@ function Root() {
   // Theme choice in Me overrides the phone's setting; useColorScheme() (and so useColors) follows it.
   useEffect(() => { if (ready) Appearance.setColorScheme(prefs.theme === "system" ? "auto" : prefs.theme); }, [ready, prefs.theme]);
   useEffect(() => { if (show) SplashScreen.hideAsync().catch(() => {}); }, [show]);
-  // Daily reminders follow the reminder settings and the user's week; reschedule whenever either changes.
+  // Daily reminders (with that day's quote) and the pre-gym snack follow the settings and the user's week.
+  // Reminders are dated 14 days ahead, so this also tops them up on every launch.
   useEffect(() => {
-    if (ready && prefs.onboarded) scheduleReminders(prefs.reminders, prefs.hour, prefs.minute, plan).catch(() => {});
+    if (!ready || !prefs.onboarded) return;
+    const quote = (date: string, day: PlanDay) => pickQuote(date, { day, streak: 0, missedYesterday: false, prYesterday: false }).text;
+    scheduleReminders(prefs.reminders, prefs.hour, prefs.minute, plan, quote).catch(() => {});
   }, [ready, prefs.onboarded, prefs.reminders, prefs.hour, prefs.minute, plan]);
+  const { onboarded, snackReminder, quietStart, quietEnd } = prefs;
+  useEffect(() => {
+    if (!ready || !onboarded) return;
+    scheduleSnack(snackReminder, plan, week.gymStart, (m) => isQuiet(m, { quietStart, quietEnd })).catch(() => {});
+  }, [ready, onboarded, snackReminder, quietStart, quietEnd, plan, week.gymStart]);
   if (!show) return <View style={{ flex: 1, backgroundColor: c.bg }} />;
   return (
     <TimerProvider>

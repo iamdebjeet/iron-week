@@ -13,8 +13,7 @@ export const FULL_DAY: Record<string, string> = {
 /** Today's key by the phone's local time */
 export const todayKey = (): DayKey => DAY_ORDER[new Date().getDay()];
 /** Local date like 2026-11-01, used to reset ticks and swaps each day */
-export const localDate = () => {
-  const d = new Date();
+export const localDate = (d = new Date()) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 

@@ -17,7 +17,8 @@ import {
 } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Btn, OptionPicker, T } from "./components/ui";
-import { ensurePermission } from "./notifications";
+import { cancelKind, ensurePermission } from "./notifications";
+import { useStore } from "./store";
 import { KEYS } from "./storage";
 import { fonts, useColors } from "./theme";
 
@@ -120,6 +121,26 @@ export function PassesProvider({ children }: { children: React.ReactNode }) {
 
   const save = useCallback((next: Passes) => { setPasses(next); AsyncStorage.setItem(KEYS.passes, JSON.stringify(next)).catch(() => {}); }, []);
 
+  // Me → Notifications → Pass expiry: no new reminders while off; switching it changes the existing ones too.
+  const { prefs } = useStore();
+  const alertsOn = prefs.passAlerts;
+  const expiry = (kind: PassKind, validTill: string) => (alertsOn ? scheduleExpiry(kind, validTill) : Promise.resolve(undefined));
+  const lastAlertsOn = useRef(alertsOn);
+  const passesRef = useRef(passes);
+  useEffect(() => { passesRef.current = passes; }, [passes]);
+  useEffect(() => {
+    if (lastAlertsOn.current === alertsOn) return;
+    lastAlertsOn.current = alertsOn;
+    (async () => {
+      await cancelKind("pass");
+      const next: Passes = {};
+      for (const [k, p] of Object.entries(passesRef.current) as [PassKind, Pass][]) {
+        next[k] = { ...p, reminderId: alertsOn ? await scheduleExpiry(k, p.validTill).catch(() => undefined) : undefined };
+      }
+      save(next);
+    })();
+  }, [alertsOn, save]);
+
   const renderPdf = (b64: string) => new Promise<string>((resolve, reject) => setJob({ b64, resolve, reject }));
 
   const removeFiles = (p?: Pass) => {
@@ -162,7 +183,7 @@ export function PassesProvider({ children }: { children: React.ReactNode }) {
       image = img.uri;
     }
     removeFiles(passes[kind]);
-    const reminderId = await scheduleExpiry(kind, validTill);
+    const reminderId = await expiry(kind, validTill);
     save({ ...passes, [kind]: { image, pdf, validTill, addedAt: iso(new Date()), reminderId } });
     return "";
   };
@@ -171,7 +192,7 @@ export function PassesProvider({ children }: { children: React.ReactNode }) {
   const setValidTill = async (kind: PassKind, validTill: string) => {
     const p = passes[kind]; if (!p) return;
     if (p.reminderId) Notifications.cancelScheduledNotificationAsync(p.reminderId).catch(() => {});
-    save({ ...passes, [kind]: { ...p, validTill, reminderId: await scheduleExpiry(kind, validTill) } });
+    save({ ...passes, [kind]: { ...p, validTill, reminderId: await expiry(kind, validTill) } });
   };
 
   const api: PassesApi = { passes, show: setViewing, openManager: () => setManagerOpen(true) };

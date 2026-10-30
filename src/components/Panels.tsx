@@ -1,16 +1,14 @@
-// Muscles-worked section, weekly overview, music buttons and reminder settings.
+// Muscles-worked section, weekly overview and music buttons.
 import React, { useState } from "react";
-import { Modal, Pressable, ScrollView, Switch, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HELPER_ONLY, MUSCLES, STRETCH_ONLY } from "../data/muscles";
 import type { PlanDay } from "../data/types";
 import { FULL_DAY, MuscleStat, collectMuscles, normalizeSetup, shownName } from "../logic";
-import { ensurePermission } from "../notifications";
-import { REMINDER_TIMES as TIMES, timeLabel } from "../logic/plan";
 import { useStore } from "../store";
 import { fonts, useColors } from "../theme";
 import { BodyDiagram } from "./BodyDiagram";
-import { Btn, OptionPicker, T, openLink } from "./ui";
+import { Btn, T, openLink } from "./ui";
 
 function useMuscles(days: PlanDay[]) {
   const { setups, swaps, stretchSetups } = useStore();
@@ -134,46 +132,5 @@ export function MusicButtons() {
       {b("♫ Spotify", "https://open.spotify.com/", c.spotify, c.spotifyText)}
       {b("▶ YouTube Music", "https://music.youtube.com/", c.ytm, c.ytmText)}
     </View>
-  );
-}
-
-export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const c = useColors();
-  const { prefs, setPrefs } = useStore();
-  const [msg, setMsg] = useState("");
-  const apply = async (enabled: boolean, minutes: number) => {
-    if (enabled && !(await ensurePermission())) {
-      setMsg("Notifications are blocked. Allow them for Iron Week in your phone's Settings › Apps › Notifications.");
-      setPrefs({ reminders: false });
-      return;
-    }
-    setMsg("");
-    // ReminderSync (root layout) reschedules from prefs + week whenever they change.
-    setPrefs({ reminders: enabled, hour: Math.floor(minutes / 60), minute: minutes % 60 });
-    if (enabled) setMsg(`Reminders set for ${timeLabel(minutes)} every day.`);
-  };
-  const cur = prefs.hour * 60 + prefs.minute;
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={{ flex: 1, backgroundColor: c.scrim, justifyContent: "center", padding: 24 }} onPress={onClose}>
-        <Pressable style={{ backgroundColor: c.surface, borderRadius: 16, padding: 18, gap: 14 }} onPress={() => {}}>
-          <T variant="display" style={{ fontSize: 24 }}>Reminders</T>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-            <View style={{ flex: 1 }}>
-              <T variant="bold">Daily reminder</T>
-              <T variant="muted">Tells you today’s workout and swim, even when the app is closed.</T>
-            </View>
-            <Switch value={prefs.reminders} onValueChange={(v) => apply(v, cur)} trackColor={{ true: c.done, false: c.line }} />
-          </View>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <T variant="label">Time</T>
-            <OptionPicker label="Reminder time" value={cur} options={TIMES} format={timeLabel} onChange={(m) => apply(prefs.reminders, m)} />
-          </View>
-          {msg ? <T variant="muted" style={{ color: c.accentText }}>{msg}</T> : null}
-          <T variant="muted" style={{ fontSize: 12 }}>Timers also alert you when the phone is locked: each rest, stretch and swim step ends with a notification.</T>
-          <View style={{ flexDirection: "row", justifyContent: "flex-end" }}><Btn kind="primary" title="Done" onPress={onClose} /></View>
-        </Pressable>
-      </Pressable>
-    </Modal>
   );
 }
