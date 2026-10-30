@@ -12,6 +12,8 @@ export const KEYS = {
   week: "week",
   quotes: "quotes",
   history: "history",
+  lifts: "lifts",
+  body: "bodyWeight",
   schemaVersion: "schemaVersion",
 } as const;
 
@@ -20,7 +22,7 @@ export const DATA_KEYS: string[] = Object.values(KEYS).filter((k) => k !== KEYS.
 
 /**
  * 1: the original single-screen app (setups, stretchSetups, daily, prefs, passes), no version key.
- * 2: adds profile, week, quotes (saved favourites) and history (one summary per day). Version 1 keys keep their shape: saved sets stay keyed by the workout's
+ * 2: adds profile, week, quotes (saved favourites), history (one summary per day), lifts (kg × reps per exercise per date) and bodyWeight. Version 1 keys keep their shape: saved sets stay keyed by the workout's
  *    source day ("tue0" = Push A, first exercise), so they follow the workout to any day.
  */
 export const SCHEMA_VERSION = 2;

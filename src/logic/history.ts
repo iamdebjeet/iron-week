@@ -20,6 +20,10 @@ export interface DaySummary {
   steps: number;
   /** ≈ kcal burned (filled in once calories are estimated) */
   kcal: number;
+  /** Personal records set that day */
+  prs?: number;
+  /** Σ kg × reps of the ticked sets */
+  volumeKg?: number;
 }
 export type History = Record<string, DaySummary>;
 

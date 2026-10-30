@@ -1,6 +1,6 @@
 // Exercise, finisher, stretch and swim cards.
-import React from "react";
-import { Pressable, Text, View } from "react-native";
+import React, { useState } from "react";
+import { Pressable, Text, TextInput, View } from "react-native";
 import type { Exercise, PlanDay, Rep } from "../data/types";
 import { REP_OPTIONS, SET_OPTIONS } from "../data/plan";
 import { ALTERNATIVES } from "../data/muscles";
@@ -11,6 +11,8 @@ import {
   stretchSteps, stretchUnit, swimName, swimSteps,
 } from "../logic";
 import { isLegs, shoulderSwimTip } from "../logic/plan";
+import { isBodyweight, kgLabel, lastSession, lastTimeText, prOf, progressionHint, repsNumber, roundKg, type LoggedSet } from "../logic/lifts";
+import { useToast } from "../toast";
 import { useStore } from "../store";
 import { useTimer } from "../timer";
 import { fonts, useColors } from "../theme";
@@ -21,8 +23,9 @@ import { Btn, Check, CollapsibleCard, HowTo, MuscleBox, OptionPicker, T, images,
 
 export function ExerciseCard({ day, index, exercise: e, open, onToggle }: { day: PlanDay; index: number; exercise: Exercise; open: boolean; onToggle: () => void }) {
   const c = useColors();
-  const { setups, setSetup, ticks, setTick, swaps, setSwap } = useStore();
+  const { setups, setSetup, ticks, setTick, swaps, setSwap, kg, setKg, lifts, today } = useStore();
   const timer = useTimer();
+  const toast = useToast();
   const [swapOpen, setSwapOpen] = React.useState(false);
   const key = day.key + index; // ticks and swaps: this calendar day
   const setupKey = day.plan + index; // sets and reps: follow the workout to whichever day it is on
@@ -34,6 +37,29 @@ export function ExerciseCard({ day, index, exercise: e, open, onToggle }: { day:
   const done = Array.from({ length: setup.sets }, (_, s) => !!ticks[`${key}-${s}`]);
   const mm = musclesOf(name);
   const suffix = repSuffix(e);
+  const bw = isBodyweight(name);
+  const last = lastSession(lifts, name, today);
+  const lastText = lastTimeText(last, bw);
+  const hint = progressionHint(name, e.reps, last);
+  /** Last session's weight for set s (or its last set), to fill in and to show as the placeholder */
+  const lastKg = (s: number) => (last ? (last.sets[s] ?? last.sets[last.sets.length - 1])?.kg : undefined);
+
+  const tickSet = (s: number) => {
+    const id = `${key}-${s}`;
+    const on = !done[s];
+    setTick(id, on);
+    if (!on) return;
+    timer.rest(e.rest, name);
+    // No weight typed: assume the same as last time (bodyweight moves: no added weight).
+    const typed = kg[id];
+    const w = typed ?? lastKg(s) ?? (bw ? 0 : undefined);
+    if (w === undefined) return;
+    if (typed === undefined) setKg(id, w);
+    const earlier: LoggedSet[] = done.flatMap((d, x) => (d && x !== s && kg[`${key}-${x}`] !== undefined ? [{ kg: kg[`${key}-${x}`], reps: repsNumber(setup.reps[x]) }] : []));
+    const before = [...(lifts[name] ?? []).filter((x) => x.date < today), { date: today, sets: earlier }];
+    const reps = repsNumber(setup.reps[s]);
+    if (prOf(before, { kg: w, reps }, bw)) toast(`🏆 New PR · ${name}: ${kgLabel(w, bw)} × ${reps}`);
+  };
 
   const changeSets = (n: number) => {
     const reps = setup.reps.slice(0, n);
@@ -53,6 +79,12 @@ export function ExerciseCard({ day, index, exercise: e, open, onToggle }: { day:
       complete={done.every(Boolean)}
     >
       {mm ? <MuscleBox main={mm.main} helps={mm.helps} /> : null}
+      {lastText || hint ? (
+        <View style={{ marginTop: 10, gap: 4 }}>
+          {lastText ? <T variant="muted" style={{ fontFamily: fonts.bodyBold }}>{lastText}</T> : null}
+          {hint ? <T variant="muted" style={{ color: c.accentText, fontFamily: fonts.bodyBold }}>↑ {hint}</T> : null}
+        </View>
+      ) : null}
 
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, alignItems: "center", marginTop: 12 }}>
         <T variant="label">Sets</T>
@@ -65,13 +97,10 @@ export function ExerciseCard({ day, index, exercise: e, open, onToggle }: { day:
 
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
         {setup.reps.map((r, s) => (
-          <Check key={s} on={done[s]} label={`Set ${s + 1}`} onPress={() => {
-            const on = !done[s];
-            setTick(`${key}-${s}`, on);
-            if (on) timer.rest(e.rest, name);
-          }}>
+          <Check key={s} on={done[s]} label={`Set ${s + 1}`} onPress={() => tickSet(s)}>
             <OptionPicker<Rep> label={`Reps for set ${s + 1}`} value={r} options={repOpts} format={repLabel}
               onChange={(v) => { const reps = [...setup.reps]; reps[s] = v; setSetup(setupKey, { sets: setup.sets, reps }); }} />
+            <KgInput key={String(kg[`${key}-${s}`])} value={kg[`${key}-${s}`]} bw={bw} placeholder={lastKg(s)} label={`Weight for set ${s + 1}`} onChange={(v) => setKg(`${key}-${s}`, v)} />
           </Check>
         ))}
       </View>
@@ -103,6 +132,28 @@ export function ExerciseCard({ day, index, exercise: e, open, onToggle }: { day:
 
       <HowTo items={cuesOf(name)} />
     </CollapsibleCard>
+  );
+}
+
+/** kg for one set, in 0.5 kg steps. Bodyweight moves take the added weight ("BW +5"). Empty shows last time's weight greyed out. */
+function KgInput({ value, bw, placeholder, label, onChange }: { value?: number; bw: boolean; placeholder?: number; label: string; onChange: (kg: number | null) => void }) {
+  const c = useColors();
+  // The parent keys this by `value`, so a saved change (e.g. filled in from last time) starts fresh text.
+  const [text, setText] = useState(value === undefined ? "" : String(value));
+  const commit = () => {
+    const n = Number(text.replace(",", "."));
+    if (!text.trim()) onChange(null);
+    else if (Number.isFinite(n) && n >= 0 && n <= 500) onChange(roundKg(n));
+    else setText(value === undefined ? "" : String(value));
+  };
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 3, borderWidth: 1, borderColor: c.line, backgroundColor: c.bg, borderRadius: 8, paddingHorizontal: 7, minHeight: 34 }}>
+      {bw ? <Text style={{ fontFamily: fonts.bodyBold, fontSize: 12, color: c.muted }}>BW +</Text> : null}
+      <TextInput value={text} onChangeText={setText} onEndEditing={commit} onSubmitEditing={commit} keyboardType="decimal-pad" returnKeyType="done"
+        placeholder={placeholder === undefined ? (bw ? "0" : "kg") : String(placeholder)} placeholderTextColor={c.muted} maxLength={5} selectTextOnFocus
+        accessibilityLabel={label} style={{ minWidth: 34, color: c.ink, fontFamily: fonts.bodyBold, fontSize: 14, paddingVertical: 4, textAlign: "right" }} />
+      <Text style={{ fontFamily: fonts.body, fontSize: 12, color: c.muted }}>kg</Text>
+    </View>
   );
 }
 

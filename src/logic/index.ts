@@ -1,7 +1,7 @@
 // Pure helpers shared by the screens: defaults, timer steps and the muscle map.
 import { DAYS, FINISHER_MOVES, REP_OPTIONS } from "../data/plan";
 import { STRETCHES, STRETCH_PLANS, HOLD_OPTIONS, STRETCH_REP_OPTIONS, TIME_OPTIONS } from "../data/stretches";
-import { ALTERNATIVES, EXERCISE_MUSCLES, EXTRA_EXERCISES, MUSCLES } from "../data/muscles";
+import { ALTERNATIVES, EXERCISE_MUSCLES, EXTRA_EXERCISES, HELPER_ONLY, MUSCLES, STRETCH_ONLY } from "../data/muscles";
 import { SWIM_BLOCKS } from "../data/swim";
 import type { Day, DayKey, Exercise, PlanDay, ExerciseSetup, MuscleUse, Rep, StretchSetup, TimerStep } from "../data/types";
 
@@ -163,4 +163,13 @@ export function collectMuscles(
   });
   Object.values(M).forEach((x) => x.items.sort((a, b) => a.kind - b.kind));
   return M;
+}
+
+export type WeeklyRating = "good" | "ok" | "low" | "stretch" | "helper";
+/** Weekly direct sets for a muscle: Good ≥ 10, OK ≥ 6, else Low (core: 8 / 5). Stretch-only and helper-only muscles aren't rated. */
+export function weeklyRating(name: string, direct: number): WeeklyRating {
+  if ((STRETCH_ONLY as string[]).includes(name)) return "stretch";
+  if ((HELPER_ONLY as string[]).includes(name)) return "helper";
+  const lo = name === "Abs & core" ? 5 : 6, hi = name === "Abs & core" ? 8 : 10;
+  return direct >= hi ? "good" : direct >= lo ? "ok" : "low";
 }

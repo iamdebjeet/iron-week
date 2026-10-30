@@ -2,15 +2,15 @@
 import React, { useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { HELPER_ONLY, MUSCLES, STRETCH_ONLY } from "../data/muscles";
+import { MUSCLES } from "../data/muscles";
 import type { PlanDay } from "../data/types";
-import { FULL_DAY, MuscleStat, collectMuscles, normalizeSetup, shownName } from "../logic";
+import { FULL_DAY, MuscleStat, collectMuscles, normalizeSetup, shownName, weeklyRating } from "../logic";
 import { useStore } from "../store";
 import { fonts, useColors } from "../theme";
 import { BodyDiagram } from "./BodyDiagram";
 import { Btn, T, openLink } from "./ui";
 
-function useMuscles(days: PlanDay[]) {
+export function useMuscles(days: PlanDay[]) {
   const { setups, swaps, stretchSetups } = useStore();
   return collectMuscles(
     days,
@@ -25,12 +25,8 @@ function MuscleCard({ name, x, weekly }: { name: string; x: MuscleStat; weekly: 
   const [open, setOpen] = useState(false);
   let chip: [string, string];
   if (weekly) {
-    if ((STRETCH_ONLY as string[]).includes(name)) chip = ["Stretch focus", c.muted];
-    else if ((HELPER_ONLY as string[]).includes(name)) chip = ["Trained by other lifts", c.muted];
-    else {
-      const lo = name === "Abs & core" ? 5 : 6, hi = name === "Abs & core" ? 8 : 10;
-      chip = x.direct >= hi ? ["Good", c.done] : x.direct >= lo ? ["OK", c.accentText] : ["Low", c.warn];
-    }
+    const r = weeklyRating(name, x.direct);
+    chip = ({ stretch: ["Stretch focus", c.muted], helper: ["Trained by other lifts", c.muted], good: ["Good", c.done], ok: ["OK", c.accentText], low: ["Low", c.warn] } as const)[r] as [string, string];
   } else chip = x.direct ? ["Main target", c.done] : x.help ? ["Helper", c.accentText] : ["Stretch only", c.muted];
   const stat = (n: number, l: string) => (
     <Text style={{ color: c.ink }}><Text style={{ fontFamily: fonts.display, fontSize: 24 }}>{n}</Text><Text style={{ color: c.muted, fontFamily: fonts.bodyBold, fontSize: 12 }}> {l}{n === 1 ? "" : l === "stretch" ? "es" : "s"}</Text></Text>

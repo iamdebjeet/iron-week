@@ -18,6 +18,8 @@ import { WaterChip } from "../components/Water";
 import { useNow } from "../hooks/useNow";
 import { contextLine, pickQuote, type QuoteContext } from "../logic/quotes";
 import { isGymMode } from "../logic/time";
+import { useProgress } from "../progress";
+import { WorkoutSummary } from "../components/WorkoutSummary";
 import { Btn, T } from "../components/ui";
 
 type View3 = "workout" | "stretch" | "swim";
@@ -28,7 +30,8 @@ const greeting = (hour: number) => (hour < 12 ? "Good morning" : hour < 17 ? "Go
 export function TodayScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
-  const { setups, stretchSetups, ticks, resetDay, plan, profile, week, favQuotes, toggleFavQuote, quoteOffset, nextQuote } = useStore();
+  const { setups, stretchSetups, ticks, resetDay, plan, profile, week, favQuotes, toggleFavQuote, quoteOffset, nextQuote, setPrefs } = useStore();
+  const progressInfo = useProgress();
   const timer = useTimer();
   const now = useNow();
   const hour = now.getHours();
@@ -36,6 +39,10 @@ export function TodayScreen() {
   const [view, setView] = useState<View3>("workout");
   const [opened, setOpened] = useState<Record<string, boolean>>({});
   const [weekly, setWeekly] = useState(false);
+  const [summary, setSummary] = useState(false);
+  // The summary also opens by itself once when the 60-min session runs out (if any set was done).
+  const [seenEnd, setSeenEnd] = useState<number | null>(null);
+  const endedAt = timer.session.endedAt;
   const [resetArmed, setResetArmed] = useState(false);
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const day = plan.find((d) => d.key === dayKey)!;
@@ -47,8 +54,7 @@ export function TodayScreen() {
 
   // Quote and gym mode are about today (not the day tab being looked at).
   const today = plan.find((d) => d.key === DAY_ORDER[now.getDay()])!;
-  // Streak, missed-day and PR context arrive with the daily history (Progress phase); 0 / false until then.
-  const qctx: QuoteContext = { day: today, streak: 0, missedYesterday: false, prYesterday: false };
+  const qctx: QuoteContext = { day: today, streak: progressInfo.streak, missedYesterday: progressInfo.missedYesterday, prYesterday: progressInfo.prYesterday };
   const quote = pickQuote(localDate(now), qctx, quoteOffset);
   const gymMode = isGymMode(now, today, week.gymStart, week.swimStart, timer.session.running);
 
@@ -175,6 +181,13 @@ export function TodayScreen() {
               <T variant="muted" style={{ fontFamily: fonts.bodyBold }}>{doneSets} / {totalSets} sets</T>
             </View>
             {progress(doneSets, totalSets)}
+            {progressInfo.lightWeek ? (
+              <View style={{ borderWidth: 1.5, borderColor: c.good, borderRadius: 12, padding: 12, marginBottom: 12, gap: 6 }}>
+                <T variant="bold">🌤 Light week (week {progressInfo.week})</T>
+                <T variant="muted">Every 7th week: use about 60% of your usual weight, same reps. Your joints and muscles catch up, and you come back stronger.</T>
+                <View style={{ flexDirection: "row" }}><Btn small title="Got it" onPress={() => setPrefs({ lightWeekSeen: progressInfo.week })} /></View>
+              </View>
+            ) : null}
             <View style={{ borderWidth: 1, borderStyle: "dashed", borderColor: c.line, borderRadius: 10, padding: 12, marginBottom: 12 }}>
               <T variant="muted" style={{ fontSize: 14 }}><Text style={{ color: c.ink, fontFamily: fonts.bodyBold }}>0–8 min warm-up: </Text>5 min treadmill or cycle, then the warm-up moves in the Stretch tab, then 1–2 light sets of the first exercise.</T>
               <View style={{ flexDirection: "row", marginTop: 8 }}><ShowPassButton kind="gym" /></View>
@@ -186,6 +199,7 @@ export function TodayScreen() {
                 return <ExerciseCard key={id} day={day} index={i} exercise={e} open={o} onToggle={() => toggle(id, o)} />;
               })}
               <FinisherCard day={day} />
+              {doneSets ? <Btn kind="primary" title="✓ Finish workout" onPress={() => setSummary(true)} style={{ alignItems: "center" }} /> : null}
             </View>
           </View>
         ) : v === "swim" ? (
@@ -205,6 +219,7 @@ export function TodayScreen() {
       </ScrollView>
 
       <WeeklyOverview visible={weekly} onClose={() => setWeekly(false)} />
+      <WorkoutSummary visible={summary || (!!endedAt && endedAt !== seenEnd && doneSets > 0)} onClose={() => { setSummary(false); setSeenEnd(endedAt); }} day={day} doneSets={doneSets} totalSets={totalSets} />
     </View>
   );
 }

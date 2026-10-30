@@ -1,4 +1,4 @@
-// Track tab: water now; steps, calories and body weight join in later phases.
+// Track tab: water and body weight; steps and calories join in a later phase.
 import React from "react";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,6 +7,7 @@ import { useNow } from "../hooks/useNow";
 import { useStore } from "../store";
 import { useColors } from "../theme";
 import { WaterCard } from "../components/Water";
+import { BodyWeightCard } from "../components/BodyWeight";
 import { T } from "../components/ui";
 
 function Soon({ icon, title, text }: { icon: string; title: string; text: string }) {
@@ -34,7 +35,7 @@ export function TrackScreen() {
       <WaterCard />
       <Soon icon="👣" title="Steps" text="Today's steps and a walking zone, coming soon." />
       <Soon icon="🔥" title="Burned today" text="A calorie estimate from your gym, swim and walks, coming soon." />
-      <Soon icon="⚖️" title="Body weight" text="Log your weight and see the trend, coming soon." />
+      <BodyWeightCard />
     </ScrollView>
   );
 }

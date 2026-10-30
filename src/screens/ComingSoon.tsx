@@ -1,4 +1,4 @@
-// Diet / Progress tabs until their phases land: a designed empty state each.
+// Diet tab until its phase lands: a designed empty state each.
 import React from "react";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -29,9 +29,4 @@ function EmptyState({ title, icon, line, items }: { title: string; icon: IconNam
 export const DietScreen = () => (
   <EmptyState title="Know your diet" icon="fork-knife" line="Log meals from a list of common Indian foods, free and offline."
     items={["Quick type: “2 roti, dal, paneer bhurji”", "Protein, carbs, fat and fibre vs your targets", "Saved meals, recents and barcode scan", "Friendly tips for what to add"]} />
-);
-
-export const ProgressScreen = () => (
-  <EmptyState title="Progress" icon="chart" line="See your streak, calendar and personal records grow."
-    items={["Month calendar: gym, swim or both", "Streak counter", "Personal records with weights", "Weekly muscle summary"]} />
 );

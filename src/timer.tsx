@@ -43,7 +43,8 @@ interface TimerApi {
   stop: () => void;
   showBig: () => void;
   minimizeBig: () => void;
-  session: { left: number; running: boolean; toggle: () => void; reset: () => void };
+  /** endedAt: when the 60 min last ran out (ms), so screens can show the workout summary */
+  session: { left: number; running: boolean; endedAt: number | null; toggle: () => void; reset: () => void };
 }
 
 const Ctx = createContext<TimerApi | null>(null);
@@ -63,6 +64,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   // session timer
   const [sessionEnd, setSessionEnd] = useState<number | null>(null);
   const [sessionLeft, setSessionLeft] = useState(SESSION);
+  const [sessionEndedAt, setSessionEndedAt] = useState<number | null>(null);
   const sessionIds = useRef<string[]>([]);
 
   // Step alerts follow Me → Notifications: off when "Workout timers" is off, and silent in quiet hours
@@ -117,7 +119,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       if (sessionEnd) {
         const left = Math.max(0, Math.ceil((sessionEnd - Date.now()) / 1000));
         setSessionLeft(left);
-        if (left === 0) { setSessionEnd(null); Vibration.vibrate([0, 500, 200, 500]); }
+        if (left === 0) { setSessionEnd(null); setSessionEndedAt(Date.now()); Vibration.vibrate([0, 500, 200, 500]); }
       }
     }, 250);
     return () => clearInterval(iv);
@@ -169,6 +171,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       minimizeBig: () => { setPrefs({ bigTimer: false }); setBigVisible(false); },
       session: {
         left: sessionLeft,
+        endedAt: sessionEndedAt,
         running: !!sessionEnd,
         toggle: async () => {
           await cancelIds(sessionIds.current);
@@ -185,7 +188,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         reset: () => { cancelIds(sessionIds.current); sessionIds.current = []; setSessionEnd(null); setSessionLeft(SESSION); },
       },
     };
-  }, [status, snap, bigVisible, run, sessionLeft, sessionEnd, advance, reschedule, rerender, setPrefs]);
+  }, [status, snap, bigVisible, run, sessionLeft, sessionEnd, sessionEndedAt, advance, reschedule, rerender, setPrefs]);
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
 }
