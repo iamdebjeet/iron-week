@@ -7,4 +7,8 @@ module.exports = defineConfig([
   {
     ignores: ['dist/*'],
   },
+  {
+    // TypeScript already checks namespace members; this rule can't follow enums re-exported with `export *`.
+    rules: { 'import/namespace': 'off' },
+  },
 ]);

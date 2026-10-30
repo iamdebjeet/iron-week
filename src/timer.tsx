@@ -10,6 +10,23 @@ import { useStore } from "./store";
 
 interface Run { steps: TimerStep[]; ends: number[]; index: number; doneText: string; doneLabel: string }
 
+// What the screens show, copied out of the run so render never reads refs or the clock.
+interface Snap { label: string; next: string; left: number; total: number; multi: boolean }
+const IDLE: Snap = { label: "Timer", next: "", left: 0, total: 1, multi: false };
+function snapOf(r: Run | null, now: number): Snap {
+  if (!r) return IDLE;
+  const step = r.index < r.steps.length ? r.steps[r.index] : null;
+  if (!step) return { ...IDLE, label: r.doneLabel, multi: r.steps.length > 1 };
+  const after = r.steps[r.index + 1];
+  return {
+    label: step.label,
+    next: after ? `Next: ${after.label}` : "",
+    left: Math.max(0, Math.ceil((r.ends[r.index] - now) / 1000)),
+    total: step.seconds,
+    multi: r.steps.length > 1,
+  };
+}
+
 interface TimerApi {
   status: "idle" | "running" | "done";
   label: string;
@@ -36,8 +53,8 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const { setTick, prefs, setPrefs } = useStore();
   const runRef = useRef<Run | null>(null);
   const alertIds = useRef<string[]>([]);
-  const [frame, force] = useState(0);
-  const rerender = () => force((n) => n + 1);
+  const [snap, setSnap] = useState<Snap>(IDLE);
+  const rerender = useCallback(() => setSnap(snapOf(runRef.current, Date.now())), []);
   const [status, setStatus] = useState<TimerApi["status"]>("idle");
   const [bigVisible, setBigVisible] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -82,7 +99,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       else if (AppState.currentState === "active") Vibration.vibrate(250);
     }
     rerender();
-  }, [finish, setTick]);
+  }, [finish, setTick, rerender]);
 
   useEffect(() => {
     const iv = setInterval(() => {
@@ -107,25 +124,17 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     activateKeepAwakeAsync(KEEP_AWAKE).catch(() => {});
     reschedule();
     rerender();
-  }, [prefs.bigTimer, reschedule]);
-
-  const shift = (ms: number) => {
-    const r = runRef.current;
-    if (!r) return;
-    for (let i = r.index; i < r.ends.length; i++) r.ends[i] += ms;
-  };
+  }, [prefs.bigTimer, reschedule, rerender]);
 
   const api = useMemo<TimerApi>(() => {
-    const r = runRef.current;
-    const step = r && r.index < r.steps.length ? r.steps[r.index] : null;
-    const left = step && r ? Math.max(0, Math.ceil((r.ends[r.index] - Date.now()) / 1000)) : 0;
+    const shift = (ms: number) => {
+      const r = runRef.current;
+      if (!r) return;
+      for (let i = r.index; i < r.ends.length; i++) r.ends[i] += ms;
+    };
     return {
       status,
-      label: status === "done" && r ? r.doneLabel : step?.label ?? "Timer",
-      next: r && step && r.steps[r.index + 1] ? `Next: ${r.steps[r.index + 1].label}` : "",
-      left,
-      total: step?.seconds ?? 1,
-      multi: !!r && r.steps.length > 1,
+      ...snap,
       bigVisible,
       run,
       rest: (seconds, name) => run([{ label: `Rest · ${name}`, seconds }], "GO!", "Next set"),
@@ -139,6 +148,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       addTime: (seconds) => { shift(seconds * 1000); if (runRef.current) runRef.current.steps[runRef.current.index].seconds += seconds; reschedule(); rerender(); },
       stop: () => {
         runRef.current = null;
+        rerender();
         setStatus("idle");
         setBigVisible(false);
         cancelIds(alertIds.current);
@@ -165,8 +175,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         reset: () => { cancelIds(sessionIds.current); sessionIds.current = []; setSessionEnd(null); setSessionLeft(SESSION); },
       },
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, bigVisible, run, sessionLeft, sessionEnd, advance, reschedule, setPrefs, frame]);
+  }, [status, snap, bigVisible, run, sessionLeft, sessionEnd, advance, reschedule, rerender, setPrefs]);
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
 }

@@ -90,7 +90,7 @@ export function MusclesWorked({ day, onWeekly }: { day: Day; onWeekly: () => voi
       <View style={{ flexDirection: "row" }}><Btn title="▦ Weekly overview" onPress={onWeekly} /></View>
       {open ? (
         <View style={{ gap: 10 }}>
-          <T variant="muted">{day.rest ? "Recovery stretch" : day.title}. Based on this day's workout and stretching, with the sets and rounds you chose.</T>
+          <T variant="muted">{day.rest ? "Recovery stretch" : day.title}. Based on this day’s workout and stretching, with the sets and rounds you chose.</T>
           {list.map((m) => <MuscleCard key={m} name={m} x={M[m]} weekly={false} />)}
           <T variant="muted" style={{ fontSize: 12 }}>Main target: the muscle does most of the work. Helper: it assists in another lift. Stretch only: stretched today but not lifted.</T>
         </View>
@@ -167,7 +167,7 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <View style={{ flex: 1 }}>
               <T variant="bold">Daily reminder</T>
-              <T variant="muted">Tells you today's workout and swim, even when the app is closed.</T>
+              <T variant="muted">Tells you today’s workout and swim, even when the app is closed.</T>
             </View>
             <Switch value={prefs.reminders} onValueChange={(v) => apply(v, cur)} trackColor={{ true: c.done, false: c.line }} />
           </View>

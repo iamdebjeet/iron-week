@@ -1,6 +1,6 @@
 // App state saved on the phone with AsyncStorage. No backend.
 // - setups: sets/reps per exercise (kept)        - stretchSetups: rounds/time per stretch (kept)
-// - daily: ticks and swaps (reset every new day) - prefs: big timer and reminder settings
+// - daily: ticks and swaps (reset every new day) - prefs: big timer, reminder and theme settings
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -8,7 +8,8 @@ import type { ExerciseSetup, StretchSetup } from "./data/types";
 import { localDate } from "./logic";
 
 interface Daily { date: string; ticks: Record<string, boolean>; swaps: Record<string, number> }
-export interface Prefs { bigTimer: boolean; reminders: boolean; hour: number; minute: number }
+export type ThemePref = "system" | "light" | "dark";
+export interface Prefs { bigTimer: boolean; reminders: boolean; hour: number; minute: number; theme: ThemePref }
 
 interface Store {
   ready: boolean;
@@ -27,7 +28,7 @@ interface Store {
 
 const Ctx = createContext<Store | null>(null);
 const KEYS = { setups: "setups", stretch: "stretchSetups", daily: "daily", prefs: "prefs" };
-const DEFAULT_PREFS: Prefs = { bigTimer: true, reminders: false, hour: 19, minute: 0 };
+const DEFAULT_PREFS: Prefs = { bigTimer: true, reminders: false, hour: 19, minute: 0, theme: "system" };
 
 const save = (k: string, v: unknown) => AsyncStorage.setItem(k, JSON.stringify(v)).catch(() => {});
 const freshDaily = (): Daily => ({ date: localDate(), ticks: {}, swaps: {} });
@@ -39,7 +40,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [daily, setDaily] = useState<Daily>(freshDaily);
   const [prefs, setPrefsState] = useState<Prefs>(DEFAULT_PREFS);
   const dailyRef = useRef(daily);
-  dailyRef.current = daily;
+  useEffect(() => { dailyRef.current = daily; }, [daily]);
 
   useEffect(() => {
     (async () => {

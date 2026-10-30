@@ -1,47 +1,57 @@
-// Bottom timer bar and the full-screen big timer.
-import React from "react";
+// Session timer chip (+ its long-press sheet) and the full-screen big timer.
+// The mini bar shown while the big timer is minimized lives in TabBar.tsx.
+import React, { useState } from "react";
 import { Modal, Pressable, Text, View, useWindowDimensions } from "react-native";
 import Svg, { Circle } from "react-native-svg";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fmt } from "../logic";
 import { useTimer } from "../timer";
 import { fonts, useColors } from "../theme";
 import { Btn, T } from "./ui";
 
-export function TimerDock() {
+/** "⏱ 42:18 left": tap to start/pause the 60-min session, long-press for reset and quick rest timers. */
+export function SessionChip() {
   const c = useColors();
   const t = useTimer();
-  const insets = useSafeAreaInsets();
-  const running = t.status === "running";
-  const box = { flex: 1, borderWidth: 1, borderColor: running ? c.done : t.status === "done" ? c.warn : c.line, borderRadius: 10, padding: 9, gap: 5 };
+  const [sheet, setSheet] = useState(false);
+  const s = t.session;
+  const started = s.running || s.left < 3600;
   return (
-    <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: c.surface, borderTopWidth: 1, borderTopColor: c.line,
-      paddingTop: 8, paddingBottom: 8 + insets.bottom, paddingHorizontal: Math.max(12, insets.left), flexDirection: "row", gap: 10 }}>
-      <View style={[box, { borderColor: t.session.running ? c.done : c.line }]}>
-        <T variant="label">Session (60 min)</T>
-        <Text style={{ fontFamily: fonts.display, fontSize: 30, color: t.session.running ? c.done : c.ink, fontVariant: ["tabular-nums"] }}>{fmt(t.session.left)}</Text>
-        <View style={{ flexDirection: "row", gap: 6 }}>
-          <Btn small kind="primary" title={t.session.running ? "Pause" : t.session.left < 3600 ? "Resume" : "Start"} onPress={t.session.toggle} />
-          <Btn small title="Reset" onPress={t.session.reset} />
-        </View>
-      </View>
-      <View style={box}>
-        <T variant="label" numberOfLines={1}>{t.status === "idle" ? "Timer" : t.label}</T>
-        <Text style={{ fontFamily: fonts.display, fontSize: 30, color: running ? c.done : t.status === "done" ? c.warn : c.ink, fontVariant: ["tabular-nums"] }}>
-          {t.status === "done" ? "GO!" : fmt(t.left)}
-        </Text>
-        <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
-          {running ? (
-            <>
-              <Btn small title="Stop" onPress={t.stop} />
-              <Btn small title="⤢ Big" onPress={t.showBig} />
-            </>
-          ) : (
-            [60, 90, 120].map((s) => <Btn key={s} small title={s === 120 ? "2m" : `${s}s`} onPress={() => t.rest(s, "Rest")} />)
-          )}
-        </View>
-      </View>
-    </View>
+    <>
+      <Pressable onPress={s.toggle} onLongPress={() => setSheet(true)} hitSlop={6} accessibilityRole="button"
+        accessibilityLabel={`Session timer, ${fmt(s.left)} left, ${s.running ? "running" : "paused"}`} accessibilityHint="Tap to start or pause. Long-press for more."
+        style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: s.running ? c.done : c.line,
+          backgroundColor: s.running ? c.doneSoft : c.surface, borderRadius: 10, paddingHorizontal: 10, minHeight: 40, opacity: pressed ? 0.7 : 1 })}>
+        <Text style={{ fontSize: 14 }}>⏱</Text>
+        <Text style={{ fontFamily: fonts.display, fontSize: 20, color: s.running ? c.done : c.ink, fontVariant: ["tabular-nums"] }}>{fmt(s.left)}</Text>
+        <Text style={{ fontFamily: fonts.bodyMedium, fontSize: 12, color: c.muted }}>{started ? (s.running ? "left" : "paused") : "start"}</Text>
+      </Pressable>
+      <SessionSheet visible={sheet} onClose={() => setSheet(false)} />
+    </>
+  );
+}
+
+function SessionSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const c = useColors();
+  const t = useTimer();
+  const s = t.session;
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={{ flex: 1, backgroundColor: c.scrim, justifyContent: "center", padding: 24 }} onPress={onClose}>
+        <Pressable style={{ backgroundColor: c.surface, borderRadius: 16, padding: 18, gap: 12 }} onPress={() => {}}>
+          <T variant="display" style={{ fontSize: 24 }}>Session (60 min)</T>
+          <Text style={{ fontFamily: fonts.display, fontSize: 44, color: s.running ? c.done : c.ink, fontVariant: ["tabular-nums"] }}>{fmt(s.left)}</Text>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <Btn kind="primary" title={s.running ? "Pause" : s.left < 3600 ? "Resume" : "Start"} onPress={s.toggle} />
+            <Btn title="Reset" onPress={s.reset} />
+          </View>
+          <T variant="label" style={{ marginTop: 6 }}>Quick rest timer</T>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            {[60, 90, 120].map((sec) => <Btn key={sec} title={sec === 120 ? "2m" : `${sec}s`} onPress={() => { t.rest(sec, "Rest"); onClose(); }} />)}
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "flex-end" }}><Btn title="Close" onPress={onClose} /></View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 

@@ -1,37 +1,43 @@
-// The one screen: day tabs, Workout / Stretching views, muscles worked, timers.
+// Today tab: greeting + session chip, day tabs, Workout / Stretch / Swim views, muscles worked.
 import React, { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { DAYS } from "./data/plan";
-import { STRETCHES, STRETCH_PLANS } from "./data/stretches";
-import { SWIM_BLOCKS, SWIM_DAYS } from "./data/swim";
-import type { Day } from "./data/types";
-import { FULL_DAY, groupMinutes, getDay, normalizeSetup, stretchSetup, stretchSteps, stretchTickBase, todayKey } from "./logic";
-import { useStore } from "./store";
-import { useTimer } from "./timer";
-import { ShowPassButton, usePasses } from "./passes";
-import { fonts, useColors } from "./theme";
-import { ExerciseCard, FinisherCard, StretchCard, SwimCard } from "./components/Cards";
-import { MusclesWorked, MusicButtons, SettingsSheet, WeeklyOverview } from "./components/Panels";
-import { BigTimer, TimerDock } from "./components/TimerViews";
-import { Btn, T } from "./components/ui";
+import { DAYS } from "../data/plan";
+import { STRETCHES, STRETCH_PLANS } from "../data/stretches";
+import { SWIM_BLOCKS, SWIM_DAYS } from "../data/swim";
+import type { Day } from "../data/types";
+import { FULL_DAY, groupMinutes, getDay, normalizeSetup, stretchSetup, stretchSteps, stretchTickBase, todayKey } from "../logic";
+import { useStore } from "../store";
+import { useTimer } from "../timer";
+import { ShowPassButton } from "../passes";
+import { fonts, useColors } from "../theme";
+import { ExerciseCard, FinisherCard, StretchCard, SwimCard } from "../components/Cards";
+import { MusclesWorked, WeeklyOverview } from "../components/Panels";
+import { SessionChip } from "../components/TimerViews";
+import { Btn, T } from "../components/ui";
 
-export function HomeScreen() {
+type View3 = "workout" | "stretch" | "swim";
+const VIEW_LABEL: Record<View3, string> = { workout: "Workout", stretch: "Stretch", swim: "Swim" };
+
+const greeting = (hour: number) => (hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening");
+
+export function TodayScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const { setups, stretchSetups, ticks, resetDay } = useStore();
   const timer = useTimer();
-  const passes = usePasses();
+  const [hour] = useState(() => new Date().getHours());
   const [dayKey, setDayKey] = useState(todayKey());
-  const [view, setView] = useState<"workout" | "stretch">("workout");
+  const [view, setView] = useState<View3>("workout");
   const [opened, setOpened] = useState<Record<string, boolean>>({});
   const [weekly, setWeekly] = useState(false);
-  const [settings, setSettings] = useState(false);
   const [resetArmed, setResetArmed] = useState(false);
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const day = getDay(dayKey);
-  const v = day.rest ? "stretch" : view;
   const swimDay = SWIM_DAYS.includes(day.key);
+  // 3-way switch on gym + swim days, 2-way otherwise. The gym-closed day opens on its swim.
+  const views: View3[] = day.rest ? ["swim", "stretch"] : swimDay ? ["workout", "stretch", "swim"] : ["workout", "stretch"];
+  const v = views.includes(view) ? view : views[0];
 
   useEffect(() => () => { if (resetTimer.current) clearTimeout(resetTimer.current); }, []);
 
@@ -53,10 +59,10 @@ export function HomeScreen() {
     setResetArmed(false); resetDay(day.key); setOpened({});
   };
 
-  const swimCard = (auto: boolean) => {
+  const swimCard = () => {
     const id = "w-" + day.key;
     const allDone = SWIM_BLOCKS.every((_, j) => ticks[`${day.key}W${j}`]);
-    const o = isOpen(id, auto && !allDone);
+    const o = isOpen(id, !allDone);
     return <SwimCard day={day} open={o} onToggle={() => toggle(id, o)} />;
   };
 
@@ -100,22 +106,15 @@ export function HomeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 180 + insets.bottom, paddingHorizontal: Math.max(16, insets.left) }}>
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 32, paddingHorizontal: Math.max(16, insets.left) }}>
         {/* Header */}
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-          <T variant="display" style={{ fontSize: 34 }}>Iron Week</T>
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Entry passes" onPress={passes.openManager} hitSlop={8}
-              style={{ borderWidth: 1, borderColor: c.line, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 6 }}>
-              <Text style={{ color: c.ink, fontFamily: fonts.bodyBold }}>🎫 Passes</Text>
-            </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="Reminder settings" onPress={() => setSettings(true)} hitSlop={8}
-              style={{ borderWidth: 1, borderColor: c.line, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 6 }}>
-              <Text style={{ color: c.ink, fontFamily: fonts.bodyBold }}>⏰</Text>
-            </Pressable>
+          <View style={{ flexShrink: 1 }}>
+            <T variant="muted" style={{ fontFamily: fonts.bodyMedium }}>{greeting(hour)}</T>
+            <T variant="display" style={{ fontSize: 34 }}>{FULL_DAY[day.key]}</T>
           </View>
+          <SessionChip />
         </View>
-        <View style={{ marginTop: 10 }}><MusicButtons /></View>
 
         {/* Day tabs */}
         <View style={{ flexDirection: "row", gap: 5, marginTop: 16, marginBottom: 14 }}>
@@ -123,8 +122,8 @@ export function HomeScreen() {
             const sel = d.key === dayKey;
             const swim = SWIM_DAYS.includes(d.key);
             return (
-              <Pressable key={d.key} accessibilityRole="tab" accessibilityState={{ selected: sel }} onPress={() => setDayKey(d.key)}
-                style={{ flex: 1, alignItems: "center", paddingTop: 7, paddingBottom: 5, borderRadius: 8, borderWidth: 1,
+              <Pressable key={d.key} accessibilityRole="tab" accessibilityState={{ selected: sel }} accessibilityLabel={FULL_DAY[d.key]} onPress={() => setDayKey(d.key)}
+                style={{ flex: 1, alignItems: "center", paddingTop: 7, paddingBottom: 5, minHeight: 44, borderRadius: 8, borderWidth: 1,
                   borderColor: sel ? c.accent : c.line, backgroundColor: sel ? c.accent : c.surface, borderBottomWidth: swim ? 3 : 1, borderBottomColor: swim ? c.pool : sel ? c.accent : c.line }}>
                 <Text style={{ fontFamily: fonts.displayBold, fontSize: 15, color: sel ? c.accentInk : c.ink, textTransform: "uppercase" }}>{d.short}</Text>
                 <Text style={{ fontFamily: fonts.bodyMedium, fontSize: 9.5, color: sel ? c.accentInk : c.muted }} numberOfLines={1}>{d.rest ? "Swim" : d.title.split(" · ")[0]}</Text>
@@ -134,23 +133,21 @@ export function HomeScreen() {
         </View>
 
         {day.rest ? (
-          <View style={{ gap: 12, marginBottom: 22 }}>
-            <View style={{ borderWidth: 1, borderStyle: "dashed", borderColor: c.line, borderRadius: 12, padding: 18, alignItems: "center" }}>
-              <T variant="display" style={{ fontSize: 26 }}>Gym closed · Swim day</T>
-              <T variant="muted" style={{ textAlign: "center", marginTop: 4 }}>No gym today. Do your easy recovery swim, then the optional recovery stretch below. Sleep well and eat enough protein.</T>
-            </View>
-            {swimCard(true)}
+          <View style={{ borderWidth: 1, borderStyle: "dashed", borderColor: c.line, borderRadius: 12, padding: 18, alignItems: "center", marginBottom: 12 }}>
+            <T variant="display" style={{ fontSize: 26 }}>Gym closed · Swim day</T>
+            <T variant="muted" style={{ textAlign: "center", marginTop: 4 }}>No gym today. Do your easy recovery swim, then the optional recovery stretch. Sleep well and eat enough protein.</T>
           </View>
-        ) : (
-          <View style={{ flexDirection: "row", borderWidth: 1, borderColor: c.line, borderRadius: 10, overflow: "hidden", marginBottom: 16, backgroundColor: c.surface }}>
-            {(["workout", "stretch"] as const).map((k) => (
-              <Pressable key={k} accessibilityRole="button" accessibilityState={{ selected: v === k }} onPress={() => setView(k)}
-                style={{ flex: 1, paddingVertical: 10, alignItems: "center", backgroundColor: v === k ? c.ink : "transparent" }}>
-                <Text style={{ fontFamily: fonts.displayBold, fontSize: 16, textTransform: "uppercase", color: v === k ? c.bg : c.muted, letterSpacing: 0.5 }}>{k === "workout" ? "Workout" : "Stretching"}</Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
+        ) : null}
+
+        {/* Workout / Stretch / Swim switch */}
+        <View style={{ flexDirection: "row", borderWidth: 1, borderColor: c.line, borderRadius: 10, overflow: "hidden", marginBottom: 16, backgroundColor: c.surface }}>
+          {views.map((k) => (
+            <Pressable key={k} accessibilityRole="button" accessibilityState={{ selected: v === k }} onPress={() => setView(k)}
+              style={{ flex: 1, paddingVertical: 10, minHeight: 44, justifyContent: "center", alignItems: "center", backgroundColor: v === k ? c.ink : "transparent" }}>
+              <Text style={{ fontFamily: fonts.displayBold, fontSize: 16, textTransform: "uppercase", color: v === k ? c.bg : k === "swim" ? c.pool : c.muted, letterSpacing: 0.5 }}>{VIEW_LABEL[k]}</Text>
+            </Pressable>
+          ))}
+        </View>
 
         {v === "workout" ? (
           <View>
@@ -160,7 +157,7 @@ export function HomeScreen() {
             </View>
             {progress(doneSets, totalSets)}
             <View style={{ borderWidth: 1, borderStyle: "dashed", borderColor: c.line, borderRadius: 10, padding: 12, marginBottom: 12 }}>
-              <T variant="muted" style={{ fontSize: 14 }}><Text style={{ color: c.ink, fontFamily: fonts.bodyBold }}>0–8 min warm-up: </Text>5 min treadmill or cycle, then the warm-up moves in the Stretching tab, then 1–2 light sets of the first exercise.</T>
+              <T variant="muted" style={{ fontSize: 14 }}><Text style={{ color: c.ink, fontFamily: fonts.bodyBold }}>0–8 min warm-up: </Text>5 min treadmill or cycle, then the warm-up moves in the Stretch tab, then 1–2 light sets of the first exercise.</T>
               <View style={{ flexDirection: "row", marginTop: 8 }}><ShowPassButton kind="gym" /></View>
             </View>
             <View style={{ gap: 12 }}>
@@ -170,9 +167,10 @@ export function HomeScreen() {
                 return <ExerciseCard key={id} day={day} index={i} exercise={e} open={o} onToggle={() => toggle(id, o)} />;
               })}
               <FinisherCard day={day} />
-              {swimDay ? swimCard(firstOpenEx === -1) : null}
             </View>
           </View>
+        ) : v === "swim" ? (
+          <View style={{ gap: 12 }}>{swimCard()}</View>
         ) : (
           <View>{stretchGroup("w")}{stretchGroup("c")}</View>
         )}
@@ -187,10 +185,7 @@ export function HomeScreen() {
         <MusclesWorked day={day} onWeekly={() => setWeekly(true)} />
       </ScrollView>
 
-      <TimerDock />
-      <BigTimer />
       <WeeklyOverview visible={weekly} onClose={() => setWeekly(false)} />
-      <SettingsSheet visible={settings} onClose={() => setSettings(false)} />
     </View>
   );
 }

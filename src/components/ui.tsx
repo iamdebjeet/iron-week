@@ -115,22 +115,26 @@ export function CollapsibleCard({ title, titleColor, meta, badge, done, total, o
   );
 }
 
-/** Body diagram with a Main / Helps legend */
-export function MuscleBox({ main, helps, stretch }: { main: string[]; helps: string[]; stretch?: boolean }) {
+function LegendRow({ color, label, list }: { color: string; label: string; list: string[] }) {
   const c = useColors();
-  if (!main.length) return null;
-  const Row = ({ color, label, list }: { color: string; label: string; list: string[] }) => (
+  return (
     <View style={{ flexDirection: "row", gap: 7, alignItems: "flex-start" }}>
       <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: color, marginTop: 4 }} />
       <Text style={{ flex: 1, color: c.ink, fontFamily: fonts.body, fontSize: 14 }}><Text style={{ fontFamily: fonts.bodyBold }}>{label}: </Text>{list.join(", ")}</Text>
     </View>
   );
+}
+
+/** Body diagram with a Main / Helps legend */
+export function MuscleBox({ main, helps, stretch }: { main: string[]; helps: string[]; stretch?: boolean }) {
+  const c = useColors();
+  if (!main.length) return null;
   return (
     <View style={{ flexDirection: "row", gap: 14, alignItems: "center", marginTop: 12, padding: 10, borderRadius: 10, backgroundColor: c.bg }}>
       <BodyDiagram main={main} helps={helps} />
       <View style={{ flex: 1, gap: 6 }}>
-        <Row color={c.hit} label={stretch ? "Stretches" : "Main"} list={main} />
-        {!stretch && helps.length ? <Row color={c.help} label="Helps" list={helps} /> : null}
+        <LegendRow color={c.hit} label={stretch ? "Stretches" : "Main"} list={main} />
+        {!stretch && helps.length ? <LegendRow color={c.help} label="Helps" list={helps} /> : null}
       </View>
     </View>
   );

@@ -7,6 +7,8 @@ const light = {
   figure: "#cfd3cf", hit: "#e4572e", help: "#f3b39c", pool: "#1a78b8",
   spotify: "#1DB954", spotifyText: "#118a3d", ytm: "#FF0000", ytmText: "#d40000",
   scrim: "rgba(10,12,14,0.55)",
+  // Status colours (water, steps, diet bands). Darker than the dark-mode ones so they read on white.
+  low: "#a87400", good: "#1a78b8", excellent: "#2f8a57", veryHigh: "#c2410c", tooMuch: "#c81e1e",
 };
 
 const dark: typeof light = {
@@ -16,6 +18,7 @@ const dark: typeof light = {
   figure: "#6f7a83", hit: "#ff6a3d", help: "#c0705a", pool: "#55b6ee",
   spotify: "#1ED760", spotifyText: "#1ED760", ytm: "#FF4E45", ytmText: "#FF6B63",
   scrim: "rgba(0,0,0,0.6)",
+  low: "#f2b621", good: "#55b6ee", excellent: "#4cc282", veryHigh: "#fb8a4c", tooMuch: "#ff5a5a",
 };
 
 export type Colors = typeof light;
