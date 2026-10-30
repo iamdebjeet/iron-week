@@ -1,7 +1,7 @@
 // Exercise, finisher, stretch and swim cards.
 import React from "react";
 import { Pressable, Text, View } from "react-native";
-import type { Day, Exercise, Rep } from "../data/types";
+import type { Exercise, PlanDay, Rep } from "../data/types";
 import { REP_OPTIONS, SET_OPTIONS } from "../data/plan";
 import { ALTERNATIVES } from "../data/muscles";
 import { STRETCHES, ROUND_OPTIONS } from "../data/stretches";
@@ -10,6 +10,7 @@ import {
   cuesOf, musclesOf, normalizeSetup, repLabel, repSuffix, repSummary, shownName, stretchOptions, stretchSetup,
   stretchSteps, stretchUnit, swimName, swimSteps,
 } from "../logic";
+import { isLegs, shoulderSwimTip } from "../logic/plan";
 import { useStore } from "../store";
 import { useTimer } from "../timer";
 import { fonts, useColors } from "../theme";
@@ -18,13 +19,14 @@ import { Btn, Check, CollapsibleCard, HowTo, MuscleBox, OptionPicker, T, images,
 
 /* ---------------- exercise ---------------- */
 
-export function ExerciseCard({ day, index, exercise: e, open, onToggle }: { day: Day; index: number; exercise: Exercise; open: boolean; onToggle: () => void }) {
+export function ExerciseCard({ day, index, exercise: e, open, onToggle }: { day: PlanDay; index: number; exercise: Exercise; open: boolean; onToggle: () => void }) {
   const c = useColors();
   const { setups, setSetup, ticks, setTick, swaps, setSwap } = useStore();
   const timer = useTimer();
   const [swapOpen, setSwapOpen] = React.useState(false);
-  const key = day.key + index;
-  const setup = normalizeSetup(setups[key], e);
+  const key = day.key + index; // ticks and swaps: this calendar day
+  const setupKey = day.plan + index; // sets and reps: follow the workout to whichever day it is on
+  const setup = normalizeSetup(setups[setupKey], e);
   const name = shownName(e, swaps[key]);
   const swapped = name !== e.name;
   const allowMax = e.reps.includes("max");
@@ -36,7 +38,7 @@ export function ExerciseCard({ day, index, exercise: e, open, onToggle }: { day:
   const changeSets = (n: number) => {
     const reps = setup.reps.slice(0, n);
     while (reps.length < n) reps.push(reps[reps.length - 1]);
-    setSetup(key, { sets: n, reps });
+    setSetup(setupKey, { sets: n, reps });
   };
 
   return (
@@ -57,8 +59,8 @@ export function ExerciseCard({ day, index, exercise: e, open, onToggle }: { day:
         <OptionPicker label="Number of sets" value={setup.sets} options={SET_OPTIONS} onChange={changeSets} />
         <T variant="label">All sets</T>
         <OptionPicker<Rep> label="Reps for every set" value={null} placeholder="reps…" options={repOpts} format={repLabel}
-          onChange={(r) => setSetup(key, { sets: setup.sets, reps: Array(setup.sets).fill(r) })} />
-        {setups[key] ? <Pressable onPress={() => setSetup(key, null)}><Text style={{ color: c.muted, textDecorationLine: "underline", fontSize: 13 }}>Reset to plan</Text></Pressable> : null}
+          onChange={(r) => setSetup(setupKey, { sets: setup.sets, reps: Array(setup.sets).fill(r) })} />
+        {setups[setupKey] ? <Pressable onPress={() => setSetup(setupKey, null)}><Text style={{ color: c.muted, textDecorationLine: "underline", fontSize: 13 }}>Reset to plan</Text></Pressable> : null}
       </View>
 
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
@@ -69,7 +71,7 @@ export function ExerciseCard({ day, index, exercise: e, open, onToggle }: { day:
             if (on) timer.rest(e.rest, name);
           }}>
             <OptionPicker<Rep> label={`Reps for set ${s + 1}`} value={r} options={repOpts} format={repLabel}
-              onChange={(v) => { const reps = [...setup.reps]; reps[s] = v; setSetup(key, { sets: setup.sets, reps }); }} />
+              onChange={(v) => { const reps = [...setup.reps]; reps[s] = v; setSetup(setupKey, { sets: setup.sets, reps }); }} />
           </Check>
         ))}
       </View>
@@ -106,7 +108,7 @@ export function ExerciseCard({ day, index, exercise: e, open, onToggle }: { day:
 
 /* ---------------- finisher ---------------- */
 
-export function FinisherCard({ day }: { day: Day }) {
+export function FinisherCard({ day }: { day: PlanDay }) {
   const c = useColors();
   const { ticks, setTick } = useStore();
   const id = day.key + "fin";
@@ -166,18 +168,19 @@ export function StretchCard({ stretchKey, tickBase, open, onToggle }: { stretchK
 
 /* ---------------- swim ---------------- */
 
-export function SwimCard({ day, open, onToggle }: { day: Day; open: boolean; onToggle: () => void }) {
+export function SwimCard({ day, open, onToggle }: { day: PlanDay; open: boolean; onToggle: () => void }) {
   const c = useColors();
   const { ticks, setTick } = useStore();
   const timer = useTimer();
   const done = SWIM_BLOCKS.map((_, j) => !!ticks[`${day.key}W${j}`]);
   const total = SWIM_BLOCKS.reduce((a, b) => a + b.minutes, 0);
+  const tip = shoulderSwimTip(day);
   return (
     <CollapsibleCard
       title={"Swim" + (day.rest ? " · Recovery" : "")}
       titleColor={c.pool}
       borderColor={c.pool}
-      meta={day.rest ? "Easy recovery swim · no gym today" : "Right after the gym · keep it easy after leg day"}
+      meta={day.rest ? "Easy recovery swim · no gym today" : isLegs(day.workout) ? "Right after the gym · keep it easy after leg day" : "Right after the gym · keep it easy, focus on legs and kick"}
       badge={`${total} min`}
       done={done.filter(Boolean).length}
       total={SWIM_BLOCKS.length}
@@ -185,6 +188,7 @@ export function SwimCard({ day, open, onToggle }: { day: Day; open: boolean; onT
       onToggle={onToggle}
       complete={done.every(Boolean)}
     >
+      {tip ? <T variant="bold" style={{ color: c.pool, marginTop: 10 }}>💡 {tip}</T> : null}
       <MuscleBox main={SWIM_MUSCLES.main} helps={SWIM_MUSCLES.helps} />
       <View style={{ gap: 8, marginTop: 12 }}>
         {SWIM_BLOCKS.map((b, j) => {
@@ -213,7 +217,9 @@ export function SwimCard({ day, open, onToggle }: { day: Day; open: boolean; onT
       <HowTo title="Swim tips" items={[
         "For the first 3–4 weeks keep every swim easy. Build technique and breathing first.",
         "Breathe out slowly under water, and breathe in only when you turn your head.",
-        day.rest ? "Monday is your recovery day, so keep the pace gentle." : "Your legs are tired after leg day, so let your arms do more of the work and keep a gentle kick.",
+        day.rest ? "Today is your recovery day, so keep the pace gentle."
+          : isLegs(day.workout) ? "Your legs are tired after leg day, so let your arms do more of the work and keep a gentle kick."
+          : "Your shoulders worked in the gym today, so let your legs and kick do more of the work.",
         "Have a light snack 1.5–2 hours before. Don't swim on a full stomach.",
         "Drink water before and after. You sweat in the pool too.",
         "If a shoulder hurts, stop and rest. Don't push through shoulder pain.",

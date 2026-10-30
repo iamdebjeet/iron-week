@@ -1,24 +1,23 @@
 // Pure helpers shared by the screens: defaults, timer steps and the muscle map.
-import { DAYS, FINISHER_MOVES, REP_OPTIONS } from "./data/plan";
-import { STRETCHES, STRETCH_PLANS, HOLD_OPTIONS, STRETCH_REP_OPTIONS, TIME_OPTIONS } from "./data/stretches";
-import { ALTERNATIVES, EXERCISE_MUSCLES, EXTRA_EXERCISES, MUSCLES } from "./data/muscles";
-import { SWIM_BLOCKS } from "./data/swim";
-import type { Day, Exercise, ExerciseSetup, MuscleUse, Rep, StretchSetup, TimerStep } from "./data/types";
+import { DAYS, FINISHER_MOVES, REP_OPTIONS } from "../data/plan";
+import { STRETCHES, STRETCH_PLANS, HOLD_OPTIONS, STRETCH_REP_OPTIONS, TIME_OPTIONS } from "../data/stretches";
+import { ALTERNATIVES, EXERCISE_MUSCLES, EXTRA_EXERCISES, MUSCLES } from "../data/muscles";
+import { SWIM_BLOCKS } from "../data/swim";
+import type { Day, DayKey, Exercise, PlanDay, ExerciseSetup, MuscleUse, Rep, StretchSetup, TimerStep } from "../data/types";
 
-export const DAY_ORDER = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]; // index = Date.getDay()
+export const DAY_ORDER: DayKey[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]; // index = Date.getDay()
 export const FULL_DAY: Record<string, string> = {
   mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday", sun: "Sunday",
 };
 
 /** Today's key by the phone's local time */
-export const todayKey = () => DAY_ORDER[new Date().getDay()];
+export const todayKey = (): DayKey => DAY_ORDER[new Date().getDay()];
 /** Local date like 2026-11-01, used to reset ticks and swaps each day */
 export const localDate = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-export const getDay = (key: string): Day => DAYS.find((d) => d.key === key)!;
 
 export const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, s % 60)).padStart(2, "0")}`;
 
@@ -135,9 +134,9 @@ export interface MuscleStat {
 }
 
 export function collectMuscles(
-  days: Day[],
-  setupOf: (day: Day, i: number, e: Exercise) => ExerciseSetup,
-  nameOf: (day: Day, i: number, e: Exercise) => string,
+  days: PlanDay[],
+  setupOf: (day: PlanDay, i: number, e: Exercise) => ExerciseSetup,
+  nameOf: (day: PlanDay, i: number, e: Exercise) => string,
   stretchSetups: Record<string, StretchSetup>,
 ) {
   const M: Record<string, MuscleStat> = {};
@@ -150,8 +149,8 @@ export function collectMuscles(
   };
   days.forEach((d) => {
     d.exercises.forEach((e, i) => addEx(d.short, nameOf(d, i, e), setupOf(d, i, e).sets));
-    (FINISHER_MOVES[d.key] || []).forEach(([n, s]) => addEx(d.short, n, s));
-    const plan = STRETCH_PLANS[d.key];
+    (FINISHER_MOVES[d.plan] || []).forEach(([n, s]) => addEx(d.short, n, s));
+    const plan = STRETCH_PLANS[d.plan];
     (["w", "c"] as const).forEach((g) =>
       plan[g].forEach((k) => {
         const r = stretchSetup(k, stretchSetups[k]).rounds;

@@ -1,8 +1,7 @@
 // Local notifications: timer alerts that fire even when the phone is locked, and daily gym/swim reminders.
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
-import { DAYS } from "./data/plan";
-import { SWIM_DAYS } from "./data/swim";
+import type { PlanDay } from "./data/types";
 
 const TIMER_CHANNEL = "timers";
 const REMINDER_CHANNEL = "reminders";
@@ -69,7 +68,7 @@ export async function cancelIds(ids: string[]) {
 const WEEKDAY: Record<string, number> = { sun: 1, mon: 2, tue: 3, wed: 4, thu: 5, fri: 6, sat: 7 };
 
 /** Replace all daily reminders. Pass enabled=false to just remove them. */
-export async function scheduleReminders(enabled: boolean, hour: number, minute: number) {
+export async function scheduleReminders(enabled: boolean, hour: number, minute: number, days: PlanDay[]) {
   const all = await Notifications.getAllScheduledNotificationsAsync();
   await Promise.all(
     all
@@ -77,11 +76,10 @@ export async function scheduleReminders(enabled: boolean, hour: number, minute: 
       .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
   );
   if (!enabled) return;
-  for (const d of DAYS) {
-    const swim = SWIM_DAYS.includes(d.key);
-    const title = d.rest ? "Today: Recovery swim" : `Today: ${d.title}${swim ? " + Swim" : ""}`;
+  for (const d of days) {
+    const title = d.rest ? (d.swim ? "Today: Recovery swim" : "Today: Rest day") : `Today: ${d.title}${d.swim ? " + Swim" : ""}`;
     const body = d.rest
-      ? "No gym today. Easy swim, then the recovery stretches."
+      ? d.swim ? "No gym today. Easy swim, then the recovery stretches." : "No gym or swim today. Rest well; the recovery stretches are there if you want them."
       : d.exercises.slice(0, 3).map((e) => e.name).join(", ") + "… Open Iron Week to start.";
     await Notifications.scheduleNotificationAsync({
       content: { title, body, data: { kind: "reminder" } },

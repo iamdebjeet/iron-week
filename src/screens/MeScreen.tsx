@@ -2,12 +2,15 @@
 import React, { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import Constants from "expo-constants";
+import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { FULL_DAY } from "../logic";
+import { EXPERIENCE_LABEL, GOAL_LABEL, bmi } from "../logic/profile";
 import { usePasses } from "../passes";
 import { type ThemePref, useStore } from "../store";
 import { fonts, useColors } from "../theme";
 import { MusicButtons, SettingsSheet } from "../components/Panels";
-import { T } from "../components/ui";
+import { Btn, T } from "../components/ui";
 
 const time12 = (h: number, m: number) => `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 const THEMES: { key: ThemePref; label: string }[] = [{ key: "system", label: "System" }, { key: "light", label: "Light" }, { key: "dark", label: "Dark" }];
@@ -35,31 +38,52 @@ function Row({ icon, title, detail, onPress, soon, open, children }: {
 export function MeScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
-  const { prefs, setPrefs } = useStore();
+  const { prefs, setPrefs, profile, plan } = useStore();
   const { passes, openManager } = usePasses();
   const [notif, setNotif] = useState(false);
   const [open, setOpen] = useState<"music" | "theme" | "about" | null>(null);
   const flip = (k: typeof open) => setOpen((o) => (o === k ? null : k));
+  const b = bmi(profile);
+  const stats: [string, string][] = [
+    ["Age", profile.age ? String(profile.age) : "–"],
+    ["cm", profile.heightCm ? String(profile.heightCm) : "–"],
+    ["kg", profile.weightKg ? String(profile.weightKg) : "–"],
+    ["BMI", b !== null ? b.toFixed(1) : "–"],
+  ];
+  const short = (keys: string[]) => keys.map((k) => FULL_DAY[k].slice(0, 2)).join(" ");
+  const gym = plan.filter((d) => !d.rest).map((d) => d.key), swim = plan.filter((d) => d.swim).map((d) => d.key);
+  const weekInfo = [gym.length ? `Gym ${short(gym)}` : "", swim.length ? `Swim ${short(swim)}` : ""].filter(Boolean).join(" · ") || "All rest";
   const passInfo = [passes.gym ? "Gym ✓" : null, passes.swim ? "Swim ✓" : null].filter(Boolean).join(" · ") || "None yet";
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 32, paddingHorizontal: Math.max(16, insets.left), gap: 16 }}>
-        {/* Profile header (filled in by the welcome setup in the next phase) */}
+        {/* Profile header */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
           <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: c.accent, alignItems: "center", justifyContent: "center" }}>
-            <Text style={{ fontFamily: fonts.display, fontSize: 28, color: c.accentInk }}>?</Text>
+            <Text style={{ fontFamily: fonts.display, fontSize: 28, color: c.accentInk }}>{profile.name ? profile.name[0].toUpperCase() : "?"}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <T variant="display" style={{ fontSize: 28 }}>Your profile</T>
-            <T variant="muted">Name, goal and body stats come with the welcome setup.</T>
+            <T variant="display" style={{ fontSize: 28 }} numberOfLines={1}>{profile.name || "Your profile"}</T>
+            <T variant="muted">{GOAL_LABEL[profile.goal]} · {EXPERIENCE_LABEL[profile.experience]}</T>
           </View>
+          <Btn title="Edit" onPress={() => router.push("/welcome?edit=1")} />
         </View>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          {stats.map(([label, value]) => (
+            <View key={label} accessible accessibilityLabel={`${label}: ${value}`}
+              style={{ flex: 1, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, borderRadius: 12, paddingVertical: 10, alignItems: "center" }}>
+              <Text style={{ fontFamily: fonts.display, fontSize: 24, color: c.ink }}>{value}</Text>
+              <T variant="label">{label}</T>
+            </View>
+          ))}
+        </View>
+        {b !== null ? <T variant="muted" style={{ fontSize: 12, marginTop: -8 }}>BMI is a rough guide only; it doesn’t tell muscle from fat.</T> : null}
 
         <View style={{ backgroundColor: c.surface, borderRadius: 14, borderWidth: 1, borderColor: c.line, overflow: "hidden" }}>
           <View style={{ marginTop: -1 }}>
             <Row icon="🎫" title="Entry passes" detail={passInfo} onPress={openManager} />
-            <Row icon="📅" title="My week" soon />
+            <Row icon="📅" title="My week" detail={weekInfo} onPress={() => router.push("/week")} />
             <Row icon="🔔" title="Notifications" detail={prefs.reminders ? `Daily ${time12(prefs.hour, prefs.minute)}` : "Off"} onPress={() => setNotif(true)} />
             <Row icon="🎯" title="Goals" soon />
             <Row icon="🎵" title="Music" detail="Spotify · YouTube Music" open={open === "music"} onPress={() => flip("music")}>

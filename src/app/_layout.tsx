@@ -16,14 +16,14 @@ import { BarlowCondensed_800ExtraBold } from "@expo-google-fonts/barlow-condense
 import { StoreProvider, useStore } from "../store";
 import { TimerProvider } from "../timer";
 import { PassesProvider } from "../passes";
-import { setupChannels } from "../notifications";
+import { scheduleReminders, setupChannels } from "../notifications";
 import { useColors } from "../theme";
 import { BigTimer } from "../components/TimerViews";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function Root() {
-  const { ready, prefs } = useStore();
+  const { ready, prefs, plan } = useStore();
   const c = useColors();
   const scheme = useColorScheme();
   const [fontsLoaded] = useFonts({ Barlow_400Regular, Barlow_500Medium, Barlow_600SemiBold, BarlowCondensed_700Bold, BarlowCondensed_800ExtraBold });
@@ -32,6 +32,10 @@ function Root() {
   // Theme choice in Me overrides the phone's setting; useColorScheme() (and so useColors) follows it.
   useEffect(() => { if (ready) Appearance.setColorScheme(prefs.theme === "system" ? "auto" : prefs.theme); }, [ready, prefs.theme]);
   useEffect(() => { if (show) SplashScreen.hideAsync().catch(() => {}); }, [show]);
+  // Daily reminders follow the reminder settings and the user's week; reschedule whenever either changes.
+  useEffect(() => {
+    if (ready && prefs.onboarded) scheduleReminders(prefs.reminders, prefs.hour, prefs.minute, plan).catch(() => {});
+  }, [ready, prefs.onboarded, prefs.reminders, prefs.hour, prefs.minute, plan]);
   if (!show) return <View style={{ flex: 1, backgroundColor: c.bg }} />;
   return (
     <TimerProvider>

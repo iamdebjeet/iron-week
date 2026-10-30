@@ -2,21 +2,21 @@
 import React, { useState } from "react";
 import { Modal, Pressable, ScrollView, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { DAYS } from "../data/plan";
 import { HELPER_ONLY, MUSCLES, STRETCH_ONLY } from "../data/muscles";
-import type { Day } from "../data/types";
+import type { PlanDay } from "../data/types";
 import { FULL_DAY, MuscleStat, collectMuscles, normalizeSetup, shownName } from "../logic";
-import { ensurePermission, scheduleReminders } from "../notifications";
+import { ensurePermission } from "../notifications";
+import { REMINDER_TIMES as TIMES, timeLabel } from "../logic/plan";
 import { useStore } from "../store";
 import { fonts, useColors } from "../theme";
 import { BodyDiagram } from "./BodyDiagram";
 import { Btn, OptionPicker, T, openLink } from "./ui";
 
-function useMuscles(days: Day[]) {
+function useMuscles(days: PlanDay[]) {
   const { setups, swaps, stretchSetups } = useStore();
   return collectMuscles(
     days,
-    (d, i, e) => normalizeSetup(setups[d.key + i], e),
+    (d, i, e) => normalizeSetup(setups[d.plan + i], e),
     (d, i, e) => shownName(e, swaps[d.key + i]),
     stretchSetups,
   );
@@ -69,7 +69,7 @@ function MuscleCard({ name, x, weekly }: { name: string; x: MuscleStat; weekly: 
   );
 }
 
-export function MusclesWorked({ day, onWeekly }: { day: Day; onWeekly: () => void }) {
+export function MusclesWorked({ day, onWeekly }: { day: PlanDay; onWeekly: () => void }) {
   const c = useColors();
   const [open, setOpen] = useState(false);
   const M = useMuscles([day]);
@@ -102,7 +102,8 @@ export function MusclesWorked({ day, onWeekly }: { day: Day; onWeekly: () => voi
 export function WeeklyOverview({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const c = useColors();
   const insets = useSafeAreaInsets();
-  const M = useMuscles(DAYS);
+  const { plan } = useStore();
+  const M = useMuscles(plan);
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} presentationStyle="pageSheet">
       <View style={{ flex: 1, backgroundColor: c.bg, paddingTop: 16 + (insets.top || 0) / 2 }}>
@@ -136,13 +137,6 @@ export function MusicButtons() {
   );
 }
 
-const TIMES: number[] = [];
-for (let m = 16 * 60; m <= 21 * 60; m += 15) TIMES.push(m);
-const timeLabel = (m: number) => {
-  const h = Math.floor(m / 60), mm = m % 60, h12 = ((h + 11) % 12) + 1;
-  return `${h12}:${String(mm).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
-};
-
 export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const c = useColors();
   const { prefs, setPrefs } = useStore();
@@ -154,8 +148,8 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
       return;
     }
     setMsg("");
+    // ReminderSync (root layout) reschedules from prefs + week whenever they change.
     setPrefs({ reminders: enabled, hour: Math.floor(minutes / 60), minute: minutes % 60 });
-    await scheduleReminders(enabled, Math.floor(minutes / 60), minutes % 60);
     if (enabled) setMsg(`Reminders set for ${timeLabel(minutes)} every day.`);
   };
   const cur = prefs.hour * 60 + prefs.minute;

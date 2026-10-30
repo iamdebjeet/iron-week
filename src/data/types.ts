@@ -23,6 +23,18 @@ export interface Day {
   exercises: Exercise[];
 }
 
+export type WorkoutId = "pushA" | "pullA" | "legsA" | "pushB" | "pullB" | "legsB";
+
+/** A calendar day of the user's week, built from their schedule (see logic/plan.ts) */
+export interface PlanDay extends Day {
+  /** Calendar day: ticks, swaps and labels use this */
+  key: DayKey;
+  /** Key of the source data in plan.ts / stretches.ts: saved sets, stretch plan and finisher follow the workout */
+  plan: string;
+  workout?: WorkoutId;
+  swim: boolean;
+}
+
 export interface Stretch {
   name: string;
   /** hold = seconds held, reps = dynamic reps, time = seconds non-stop */
