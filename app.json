@@ -18,8 +18,8 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "permissions": [
-        "VIBRATE",
-        "WAKE_LOCK"
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK"
       ],
       "predictiveBackGestureEnabled": false
     },
@@ -51,6 +51,12 @@
           "microphonePermission": false
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e23483e7-8545-481a-8b47-aff2e1b33331"
+      }
+    },
+    "owner": "debjeetchakroborty"
   }
 }
