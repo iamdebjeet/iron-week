@@ -158,3 +158,24 @@ export async function scheduleWater(when: Date | null, title: string, body: stri
     trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: when, channelId: REMINDER_CHANNEL },
   });
 }
+
+/**
+ * Walking zone alerts so the phone beeps even when locked: the goal (time goals only; step goals are
+ * announced live) and, in brisk mode, a beep every 3 minutes to switch between easy and fast.
+ */
+export async function scheduleWalkAlerts(start: number, goalMin: number | null, brisk: boolean, switchSec: number) {
+  await cancelKind("walk");
+  const at = (ms: number, title: string, body: string) => Notifications.scheduleNotificationAsync({
+    content: { title, body, sound: "default", data: { kind: "walk" } },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(ms), channelId: TIMER_CHANNEL },
+  });
+  const end = start + (goalMin ?? 60) * 60_000;
+  if (brisk) for (let t = start + switchSec * 1000, i = 1; t < end; t += switchSec * 1000, i++) await at(t, i % 2 ? "Walk fast 🚶‍♂️💨" : "Walk easy 🚶", "Brisk mode: switch your pace.");
+  if (goalMin) await at(end, "Walk goal reached 🎉", `${goalMin} minutes done. Keep going or finish your walk.`);
+}
+
+export const cancelWalkAlerts = () => cancelKind("walk");
+
+/** Show a notification right now (e.g. a step goal reached while walking) */
+export const notifyNow = (title: string, body: string) =>
+  Notifications.scheduleNotificationAsync({ content: { title, body, sound: "default", data: { kind: "walk" } }, trigger: null });

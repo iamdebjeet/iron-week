@@ -3,7 +3,7 @@
 import { STRETCH_PLANS } from "../data/stretches";
 import { SWIM_BLOCKS } from "../data/swim";
 import type { ExerciseSetup, PlanDay, StretchSetup } from "../data/types";
-import { DAY_ORDER, normalizeSetup, stretchSetup, stretchTickBase } from "./index";
+import { DAY_ORDER, groupMinutes, normalizeSetup, stretchSetup, stretchTickBase } from "./index";
 import { type WaterEntry, goalFor, total } from "./water";
 
 export interface Done { done: number; total: number }
@@ -79,4 +79,15 @@ export function previousDates(date: string, n: number): string[] {
     const x = new Date(y, m - 1, d - (n - i));
     return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
   });
+}
+
+/** Minutes of gym, swim and stretching behind a day's calorie estimate */
+export function activeMinutes(args: { day: PlanDay; summary: DaySummary; ticks: Record<string, boolean>; stretchSetups: Record<string, StretchSetup>; sessionSec?: number }) {
+  const { day, summary: s } = args;
+  // Gym: the session timer if it was used, else the planned hour once any set was ticked
+  const gymMin = (s.workout?.done ?? 0) > 0 ? (args.sessionSec ? args.sessionSec / 60 : 60) : 0;
+  const swimMin = SWIM_BLOCKS.reduce((a, b, j) => a + (args.ticks[`${day.key}W${j}`] ? b.minutes : 0), 0);
+  const plannedStretch = groupMinutes([...STRETCH_PLANS[day.plan].w, ...STRETCH_PLANS[day.plan].c], args.stretchSetups);
+  const stretchMin = s.stretch.total ? (plannedStretch * s.stretch.done) / s.stretch.total : 0;
+  return { gymMin, swimMin, stretchMin, recoverySwim: !!day.rest && day.swim };
 }

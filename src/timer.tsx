@@ -52,7 +52,7 @@ const SESSION = 60 * 60;
 const KEEP_AWAKE = "iron-week-timer";
 
 export function TimerProvider({ children }: { children: React.ReactNode }) {
-  const { setTick, prefs, setPrefs } = useStore();
+  const { setTick, prefs, setPrefs, setSessionSec } = useStore();
   const runRef = useRef<Run | null>(null);
   const alertIds = useRef<string[]>([]);
   const [snap, setSnap] = useState<Snap>(IDLE);
@@ -119,11 +119,11 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       if (sessionEnd) {
         const left = Math.max(0, Math.ceil((sessionEnd - Date.now()) / 1000));
         setSessionLeft(left);
-        if (left === 0) { setSessionEnd(null); setSessionEndedAt(Date.now()); Vibration.vibrate([0, 500, 200, 500]); }
+        if (left === 0) { setSessionEnd(null); setSessionEndedAt(Date.now()); setSessionSec(SESSION); Vibration.vibrate([0, 500, 200, 500]); }
       }
     }, 250);
     return () => clearInterval(iv);
-  }, [advance, status, sessionEnd]);
+  }, [advance, status, sessionEnd, setSessionSec]);
 
   const run = useCallback<TimerApi["run"]>((steps, doneText = "GO!", doneLabel = "Next set") => {
     if (!steps.length) return;
@@ -176,7 +176,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         toggle: async () => {
           await cancelIds(sessionIds.current);
           sessionIds.current = [];
-          if (sessionEnd) { setSessionEnd(null); return; } // pause
+          if (sessionEnd) { setSessionEnd(null); setSessionSec(SESSION - sessionLeft); return; } // pause: remember the time used
           const end = Date.now() + sessionLeft * 1000;
           setSessionEnd(end);
           if (await ensurePermission()) {
@@ -188,7 +188,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         reset: () => { cancelIds(sessionIds.current); sessionIds.current = []; setSessionEnd(null); setSessionLeft(SESSION); },
       },
     };
-  }, [status, snap, bigVisible, run, sessionLeft, sessionEnd, sessionEndedAt, advance, reschedule, rerender, setPrefs]);
+  }, [status, snap, bigVisible, run, sessionLeft, sessionEnd, sessionEndedAt, advance, reschedule, rerender, setPrefs, setSessionSec]);
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
 }

@@ -6,6 +6,7 @@ import { MUSCLES } from "../data/muscles";
 import type { PlanDay } from "../data/types";
 import { FULL_DAY, MuscleStat, collectMuscles, normalizeSetup, shownName, weeklyRating } from "../logic";
 import { useStore } from "../store";
+import { weekdayOf } from "../logic/history";
 import { fonts, useColors } from "../theme";
 import { BodyDiagram } from "./BodyDiagram";
 import { Btn, T, openLink } from "./ui";
@@ -67,6 +68,8 @@ export function MusclesWorked({ day, onWeekly }: { day: PlanDay; onWeekly: () =>
   const c = useColors();
   const [open, setOpen] = useState(false);
   const M = useMuscles([day]);
+  const { walks, today } = useStore();
+  const walkedToday = walks.length > 0 && weekdayOf(today) === day.key;
   const list = MUSCLES.filter((m) => M[m].exercises.size || M[m].stretches.size)
     .sort((a, b) => M[b].direct - M[a].direct || M[b].help - M[a].help || M[b].stretches.size - M[a].stretches.size);
   return (
@@ -75,7 +78,7 @@ export function MusclesWorked({ day, onWeekly }: { day: PlanDay; onWeekly: () =>
         style={{ flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: c.surface, borderWidth: 1.5, borderStyle: open ? "solid" : "dashed", borderColor: c.accent, borderRadius: 12, padding: 14 }}>
         <View style={{ flex: 1 }}>
           <T variant="display" style={{ fontSize: 24 }}>Muscles worked · {FULL_DAY[day.key]}</T>
-          <T variant="muted">{list.length} body parts worked today</T>
+          <T variant="muted">{list.length} body parts worked today{walkedToday ? " · 🚶 walk: calves, glutes, hamstrings" : ""}</T>
         </View>
         <View style={{ backgroundColor: c.accent, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 }}>
           <Text style={{ color: c.accentInk, fontFamily: fonts.bodyBold }}>{open ? "Hide ▴" : "Show ▾"}</Text>

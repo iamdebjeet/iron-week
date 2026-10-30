@@ -17,12 +17,19 @@ import { DEFAULT_PROFILE, type Profile } from "./logic/profile";
 import { DEFAULT_WATER, type WaterEntry, type WaterSettings } from "./logic/water";
 import { type DietEntry, type SavedMeal, sum } from "./logic/diet";
 import type { Food } from "./data/foods";
+import { type Walk, burnedToday, walkMinutes, DEFAULT_STEP_GOAL } from "./logic/activity";
+import { activeMinutes } from "./logic/history";
 import { KEYS, loadMany, migrate, save } from "./storage";
 
 interface Daily { date: string; ticks: Record<string, boolean>; swaps: Record<string, number>; quoteOffset?: number; water?: WaterEntry[]; waterSnooze?: number;
   /** kg per ticked-set id (bodyweight moves: added kg) */
   kg?: Record<string, number>;
-  diet?: DietEntry[] }
+  diet?: DietEntry[];
+  /** Health Connect steps so far today, and active kcal from a watch (if any) */
+  steps?: number; watchKcal?: number | null;
+  walks?: Walk[];
+  /** Session timer seconds used today (for the calorie estimate) */
+  sessionSec?: number }
 export interface FoodLib { custom: Food[]; saved: SavedMeal[]; recents: string[] }
 const EMPTY_LIB: FoodLib = { custom: [], saved: [], recents: [] };
 export interface BodyEntry { date: string; kg: number }
@@ -49,6 +56,9 @@ export interface Prefs {
   startDate: string | null;
   /** Light week already dismissed (week number) */
   lightWeekSeen: number;
+  stepGoal: number;
+  /** The Health Connect explanation was shown */
+  healthAsked: boolean;
 }
 
 interface Store {
@@ -79,6 +89,10 @@ interface Store {
   /** Today's diet log */
   diet: DietEntry[];
   foodLib: FoodLib;
+  steps: number | null;
+  watchKcal: number | null;
+  walks: Walk[];
+  sessionSec: number;
   setSetup: (key: string, s: ExerciseSetup | null) => void;
   setStretchSetup: (key: string, s: StretchSetup | null) => void;
   setTick: (id: string, on: boolean) => void;
@@ -101,12 +115,15 @@ interface Store {
   addCustomFood: (f: Food) => void;
   saveMeal: (m: Omit<SavedMeal, "id">) => void;
   deleteSavedMeal: (id: string) => void;
+  setSteps: (steps: number, watchKcal: number | null) => void;
+  addWalk: (w: Walk) => void;
+  setSessionSec: (sec: number) => void;
 }
 
 const Ctx = createContext<Store | null>(null);
 const DEFAULT_PREFS: Prefs = { bigTimer: true, reminders: false, hour: 19, minute: 0, theme: "system", onboarded: false, waterReminders: true, lastBackup: null, backupReminder: false,
   timerAlerts: true, passAlerts: true, snackReminder: false, quietStart: 22 * 60 + 30, quietEnd: 7 * 60, water: DEFAULT_WATER,
-  startDate: null, lightWeekSeen: 0,
+  startDate: null, lightWeekSeen: 0, stepGoal: DEFAULT_STEP_GOAL, healthAsked: false,
 };
 
 const totals = (diet: DietEntry[]) => {
@@ -133,10 +150,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const updateLib = useCallback((fn: (l: FoodLib) => FoodLib) => setFoodLib((l) => { const n = fn(l); save(KEYS.foods, n); return n; }), []);
 
   // What archiving a finished day needs, kept current for the midnight check.
-  const ctx = useRef({ daily, setups, stretchSetups, plan, baseWaterMl: prefs.water.baseGoalMl });
+  const ctx = useRef({ daily, setups, stretchSetups, plan, baseWaterMl: prefs.water.baseGoalMl, weightKg: profile.weightKg });
   useEffect(() => {
-    ctx.current = { daily, setups, stretchSetups, plan, baseWaterMl: prefs.water.baseGoalMl };
-  }, [daily, setups, stretchSetups, plan, prefs.water.baseGoalMl]);
+    ctx.current = { daily, setups, stretchSetups, plan, baseWaterMl: prefs.water.baseGoalMl, weightKg: profile.weightKg };
+  }, [daily, setups, stretchSetups, plan, prefs.water.baseGoalMl, profile.weightKg]);
 
   /** Save a finished day: its summary into history and its ticked sets (with kg) into the lift log */
   const archive = useCallback((old: Daily, c: Omit<typeof ctx.current, "daily">) => {
@@ -148,7 +165,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const before = (prev[name] ?? []).filter((x) => x.date < s.date);
         return s.sets.some((set) => prOf(before, set, isBodyweight(name)));
       }).length;
-      const summary = { ...summarizeDay({ date: old.date, day, ticks: old.ticks, water: old.water ?? [], setups: c.setups, stretchSetups: c.stretchSetups, baseWaterMl: c.baseWaterMl }), prs, volumeKg: volume(sessions), diet: totals(old.diet ?? []) };
+      const base = summarizeDay({ date: old.date, day, ticks: old.ticks, water: old.water ?? [], setups: c.setups, stretchSetups: c.stretchSetups, baseWaterMl: c.baseWaterMl });
+      const walks = old.walks ?? [];
+      const est = burnedToday({ weightKg: c.weightKg, walks, ...activeMinutes({ day, summary: base, ticks: old.ticks, stretchSetups: c.stretchSetups, sessionSec: old.sessionSec }) });
+      const summary = { ...base, prs, volumeKg: volume(sessions), diet: totals(old.diet ?? []), steps: old.steps ?? 0,
+        walkMin: walks.reduce((a, w) => a + walkMinutes(w), 0), kcal: old.watchKcal ?? est.total };
       setHistory((h) => { const n = addToHistory(h, summary); save(KEYS.history, n); return n; });
       const n = addSessions(prev, sessions); save(KEYS.lifts, n); return n;
     });
@@ -183,7 +204,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (dl && dl.date === localDate()) setDaily(dl);
         else if (dl) {
           // Opened on a new day: save the last day it was used before starting fresh.
-          archive(dl, { setups: loadedSetups, stretchSetups: loadedStretch, plan: buildDays(loadedWeek), baseWaterMl: loadedPrefs.water.baseGoalMl });
+          archive(dl, { setups: loadedSetups, stretchSetups: loadedStretch, plan: buildDays(loadedWeek), baseWaterMl: loadedPrefs.water.baseGoalMl, weightKg: (s[KEYS.profile] as Partial<Profile> | undefined)?.weightKg ?? null });
           const f = freshDaily(); setDaily(f); save(KEYS.daily, f);
         }
       } catch {}
@@ -214,7 +235,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<Store>(() => ({
     ready, today: daily.date, setups, stretchSetups, ticks: daily.ticks, swaps: daily.swaps, prefs, profile, week, plan, favQuotes, quoteOffset: daily.quoteOffset ?? 0,
-    water: daily.water ?? [], waterSnooze: daily.waterSnooze ?? null, history, kg: daily.kg ?? {}, lifts, body, diet: daily.diet ?? [], foodLib,
+    water: daily.water ?? [], waterSnooze: daily.waterSnooze ?? null, history, kg: daily.kg ?? {}, lifts, body, diet: daily.diet ?? [], foodLib, steps: daily.steps ?? null, watchKcal: daily.watchKcal ?? null, walks: daily.walks ?? [], sessionSec: daily.sessionSec ?? 0,
     setSetup: (key, s) => setSetups((p) => { const n = { ...p }; if (s) n[key] = s; else delete n[key]; save(KEYS.setups, n); return n; }),
     setStretchSetup: (key, s) => setStretchSetups((p) => { const n = { ...p }; if (s) n[key] = s; else delete n[key]; save(KEYS.stretch, n); return n; }),
     setTick: (id, on) => updateDaily((d) => { const t = { ...d.ticks }; if (on) t[id] = true; else delete t[id]; return { ...d, ticks: t }; }),
@@ -239,6 +260,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     addCustomFood: (f) => updateLib((l) => ({ ...l, custom: [f, ...l.custom.filter((x) => x.id !== f.id)] })),
     saveMeal: (m) => updateLib((l) => ({ ...l, saved: [{ ...m, id: String(Date.now()) }, ...l.saved] })),
     deleteSavedMeal: (id) => updateLib((l) => ({ ...l, saved: l.saved.filter((x) => x.id !== id) })),
+    setSteps: (steps, watchKcal) => updateDaily((d) => (d.steps === steps && d.watchKcal === watchKcal ? d : { ...d, steps, watchKcal })),
+    addWalk: (w) => updateDaily((d) => ({ ...d, walks: [...(d.walks ?? []), w] })),
+    setSessionSec: (sec) => updateDaily((d) => ({ ...d, sessionSec: Math.max(d.sessionSec ?? 0, Math.round(sec)) })),
     logWeight: (kg) => {
       const date = localDate();
       setBody((prev) => { const n = [...prev.filter((e) => e.date !== date), { date, kg }].sort((a, b) => (a.date < b.date ? -1 : 1)); save(KEYS.body, n); return n; });
