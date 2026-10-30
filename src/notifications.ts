@@ -87,3 +87,21 @@ export async function scheduleReminders(enabled: boolean, hour: number, minute: 
     });
   }
 }
+
+/** Monthly nudge to back up: 30 days after the last backup (or from now if there's none), at 10 AM. */
+export async function scheduleBackupReminder(enabled: boolean, lastBackup: string | null) {
+  const all = await Notifications.getAllScheduledNotificationsAsync();
+  await Promise.all(
+    all.filter((n) => (n.content.data as { kind?: string } | undefined)?.kind === "backup")
+      .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
+  );
+  if (!enabled) return;
+  const when = lastBackup ? new Date(lastBackup) : new Date();
+  when.setDate(when.getDate() + 30);
+  when.setHours(10, 0, 0, 0);
+  if (when.getTime() <= Date.now()) { when.setTime(Date.now()); when.setDate(when.getDate() + 1); when.setHours(10, 0, 0, 0); }
+  await Notifications.scheduleNotificationAsync({
+    content: { title: "Back up your Iron Week data", body: "It takes a few seconds: Me → Backup / restore → Export.", data: { kind: "backup" } },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: when, channelId: REMINDER_CHANNEL },
+  });
+}

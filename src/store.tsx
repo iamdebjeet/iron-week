@@ -17,6 +17,10 @@ export interface Prefs {
   /** Welcome setup finished or skipped */
   onboarded: boolean;
   waterReminders: boolean;
+  /** ISO time of the last backup export (or of the backup that was restored) */
+  lastBackup: string | null;
+  /** Monthly "Back up your data" reminder */
+  backupReminder: boolean;
 }
 
 interface Store {
@@ -41,7 +45,7 @@ interface Store {
 }
 
 const Ctx = createContext<Store | null>(null);
-const DEFAULT_PREFS: Prefs = { bigTimer: true, reminders: false, hour: 19, minute: 0, theme: "system", onboarded: false, waterReminders: true };
+const DEFAULT_PREFS: Prefs = { bigTimer: true, reminders: false, hour: 19, minute: 0, theme: "system", onboarded: false, waterReminders: true, lastBackup: null, backupReminder: false };
 
 const freshDaily = (): Daily => ({ date: localDate(), ticks: {}, swaps: {} });
 

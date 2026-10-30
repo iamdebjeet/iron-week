@@ -13,6 +13,9 @@ export const KEYS = {
   schemaVersion: "schemaVersion",
 } as const;
 
+/** Every key holding user data: these go into a backup (the schema version travels separately) */
+export const DATA_KEYS: string[] = Object.values(KEYS).filter((k) => k !== KEYS.schemaVersion);
+
 /**
  * 1: the original single-screen app (setups, stretchSetups, daily, prefs, passes), no version key.
  * 2: adds profile and week. Version 1 keys keep their shape: saved sets stay keyed by the workout's

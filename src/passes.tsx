@@ -18,6 +18,7 @@ import {
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Btn, OptionPicker, T } from "./components/ui";
 import { ensurePermission } from "./notifications";
+import { KEYS } from "./storage";
 import { fonts, useColors } from "./theme";
 
 // react-native-webview's class typings clash with React 19's; describe just what we use.
@@ -25,12 +26,11 @@ interface WebViewHandle { injectJavaScript: (js: string) => void }
 const WebView = RNWebView as unknown as React.ComponentType<WebViewProps & { ref?: React.Ref<WebViewHandle> }>;
 
 export type PassKind = "gym" | "swim";
-interface Pass { image: string; pdf?: string; validTill: string; addedAt: string; reminderId?: string }
-type Passes = Partial<Record<PassKind, Pass>>;
+export interface Pass { image: string; pdf?: string; validTill: string; addedAt: string; reminderId?: string }
+export type Passes = Partial<Record<PassKind, Pass>>;
 
-const STORE_KEY = "passes";
-const LABEL: Record<PassKind, string> = { gym: "Gym pass", swim: "Swim pass" };
-const passDir = () => { const d = new Directory(Paths.document, "passes"); if (!d.exists) d.create(); return d; };
+export const PASS_LABEL: Record<PassKind, string> = { gym: "Gym pass", swim: "Swim pass" };
+export const passDir = () => { const d = new Directory(Paths.document, "passes"); if (!d.exists) d.create(); return d; };
 
 /* ---------- dates ---------- */
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -39,6 +39,16 @@ const pretty = (s: string) => parse(s).toLocaleDateString("en-IN", { weekday: "s
 const daysLeft = (s: string) => { const t = new Date(); t.setHours(0, 0, 0, 0); return Math.round((parse(s).getTime() - t.getTime()) / 86_400_000); };
 const endOfMonth = () => { const t = new Date(); return iso(new Date(t.getFullYear(), t.getMonth() + 1, 0)); };
 const dateOptions = () => Array.from({ length: 70 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() + i); return iso(d); });
+
+/** Reminder 2 days before a pass runs out, at 10 AM. Returns the notification id, or undefined if too late / not allowed. */
+export async function scheduleExpiry(kind: PassKind, validTill: string) {
+  const when = parse(validTill); when.setDate(when.getDate() - 2); when.setHours(10, 0, 0, 0);
+  if (when.getTime() <= Date.now() || !(await ensurePermission())) return undefined;
+  return Notifications.scheduleNotificationAsync({
+    content: { title: `${PASS_LABEL[kind]} expires in 2 days`, body: `Valid till ${pretty(validTill)}. Renew it and add the new pass in Iron Week.`, data: { kind: "pass" } },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: when, channelId: "reminders" },
+  });
+}
 
 /* ---------- PDF -> image, using pdf.js inside a hidden WebView (needs internet only while adding) ---------- */
 const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174";
@@ -99,7 +109,7 @@ export function PassesProvider({ children }: { children: React.ReactNode }) {
   const [managerOpen, setManagerOpen] = useState(false);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORE_KEY).then((s) => {
+    AsyncStorage.getItem(KEYS.passes).then((s) => {
       if (!s) return;
       const p: Passes = JSON.parse(s);
       // Drop entries whose files are gone (for example after restoring a backup).
@@ -108,18 +118,9 @@ export function PassesProvider({ children }: { children: React.ReactNode }) {
     }).catch(() => {});
   }, []);
 
-  const save = useCallback((next: Passes) => { setPasses(next); AsyncStorage.setItem(STORE_KEY, JSON.stringify(next)).catch(() => {}); }, []);
+  const save = useCallback((next: Passes) => { setPasses(next); AsyncStorage.setItem(KEYS.passes, JSON.stringify(next)).catch(() => {}); }, []);
 
   const renderPdf = (b64: string) => new Promise<string>((resolve, reject) => setJob({ b64, resolve, reject }));
-
-  const scheduleExpiry = async (kind: PassKind, validTill: string) => {
-    const when = parse(validTill); when.setDate(when.getDate() - 2); when.setHours(10, 0, 0, 0);
-    if (when.getTime() <= Date.now() || !(await ensurePermission())) return undefined;
-    return Notifications.scheduleNotificationAsync({
-      content: { title: `${LABEL[kind]} expires in 2 days`, body: `Valid till ${pretty(validTill)}. Renew it and add the new pass in Iron Week.`, data: { kind: "pass" } },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: when, channelId: "reminders" },
-    });
-  };
 
   const removeFiles = (p?: Pass) => {
     if (!p) return;
@@ -223,7 +224,7 @@ function PassViewer({ kind, pass, onClose }: { kind: PassKind | null; pass?: Pas
       {/* A Modal is a separate native window, so it needs its own gesture root. */}
       <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#fff", paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }}>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, marginBottom: 8 }}>
-          <Text style={{ fontFamily: fonts.display, fontSize: 24, color: "#111", textTransform: "uppercase" }}>{LABEL[kind!]}</Text>
+          <Text style={{ fontFamily: fonts.display, fontSize: 24, color: "#111", textTransform: "uppercase" }}>{PASS_LABEL[kind!]}</Text>
           <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close pass">
             <Text style={{ fontFamily: fonts.bodyBold, color: "#555" }}>Close ✕</Text>
           </Pressable>
@@ -232,7 +233,7 @@ function PassViewer({ kind, pass, onClose }: { kind: PassKind | null; pass?: Pas
           <Validity validTill={pass!.validTill} />
           <Text style={{ fontFamily: fonts.body, fontSize: 12, color: "#777" }}>Pinch or double-tap to zoom</Text>
         </View>
-        <ZoomableImage uri={pass!.image} width={width} maxHeight={height} label={LABEL[kind!]} onTap={onClose} />
+        <ZoomableImage uri={pass!.image} width={width} maxHeight={height} label={PASS_LABEL[kind!]} onTap={onClose} />
       </GestureHandlerRootView>
     </Modal>
   );
@@ -339,10 +340,10 @@ function PassManager({ visible, onClose, passes, onAdd, onDelete, onValidTill, o
             const accent = k === "swim" ? c.pool : c.accent;
             return (
               <View key={k} style={{ backgroundColor: c.surface, borderWidth: 1.5, borderColor: accent, borderRadius: 14, padding: 14, gap: 10 }}>
-                <T variant="title" style={{ color: k === "swim" ? c.pool : c.ink }}>{LABEL[k]}</T>
+                <T variant="title" style={{ color: k === "swim" ? c.pool : c.ink }}>{PASS_LABEL[k]}</T>
                 {p ? (
                   <>
-                    <Pressable onPress={() => onShow(k)} accessibilityRole="button" accessibilityLabel={`Show ${LABEL[k]}`}
+                    <Pressable onPress={() => onShow(k)} accessibilityRole="button" accessibilityLabel={`Show ${PASS_LABEL[k]}`}
                       style={{ borderRadius: 10, overflow: "hidden", backgroundColor: "#fff", borderWidth: 1, borderColor: c.line }}>
                       <Image source={{ uri: p.image }} resizeMode="contain" style={{ width: "100%", height: 200 }} />
                     </Pressable>

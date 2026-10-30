@@ -90,7 +90,7 @@ export function MeScreen() {
               <MusicButtons />
             </Row>
             <Row icon="❝" title="Saved quotes" soon />
-            <Row icon="💾" title="Backup / restore" soon />
+            <Row icon="💾" title="Backup / restore" detail={prefs.lastBackup ? `Last: ${new Date(prefs.lastBackup).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : "Never"} onPress={() => router.push("/backup")} />
             <Row icon="🌗" title="Theme" detail={THEMES.find((x) => x.key === prefs.theme)?.label} open={open === "theme"} onPress={() => flip("theme")}>
               <View style={{ flexDirection: "row", borderWidth: 1, borderColor: c.line, borderRadius: 10, overflow: "hidden" }}>
                 {THEMES.map((x) => {
