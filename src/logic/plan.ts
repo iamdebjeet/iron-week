@@ -96,4 +96,6 @@ export function timeLabel(m: number) {
 export const REMINDER_TIMES = Array.from({ length: 21 }, (_, i) => 16 * 60 + i * 15);
 /** Gym / swim start choices: 5:00 AM–10:55 PM every 5 min */
 export const START_TIMES = Array.from({ length: 216 }, (_, i) => 5 * 60 + i * 5);
-export const rangeLabel =(start: number, minutes: number) => `${timeLabel(start)} – ${timeLabel(start + minutes)}`;
+/** Every 30 min round the clock (quiet hours, water active hours) */
+export const HALF_HOURS = Array.from({ length: 48 }, (_, i) => i * 30);
+export const rangeLabel = (start: number, minutes: number) => `${timeLabel(start)} – ${timeLabel(start + minutes)}`;

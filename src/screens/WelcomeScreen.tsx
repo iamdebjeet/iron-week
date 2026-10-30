@@ -118,7 +118,7 @@ export function WelcomeScreen() {
           })}
         </View>
       ) : null}
-      <SwitchRow title="Water reminders" text="Gentle nudges to drink, paused during gym and swim. They start when the water tracker arrives." value={water} onChange={setWater} />
+      <SwitchRow title="Water reminders" text="Gentle nudges to drink when you forget, paused during gym and swim." value={water} onChange={setWater} />
       <T variant="muted" style={{ fontSize: 12 }}>Your phone will ask once to allow notifications.</T>
     </View>,
   ];

@@ -1,3 +1,3 @@
-import { TrackScreen } from "../../screens/ComingSoon";
+import { TrackScreen } from "../../screens/TrackScreen";
 
 export default TrackScreen;

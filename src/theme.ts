@@ -7,8 +7,9 @@ const light = {
   figure: "#cfd3cf", hit: "#e4572e", help: "#f3b39c", pool: "#1a78b8",
   spotify: "#1DB954", spotifyText: "#118a3d", ytm: "#FF0000", ytmText: "#d40000",
   scrim: "rgba(10,12,14,0.55)",
-  // Status colours (water, steps, diet bands). Darker than the dark-mode ones so they read on white.
-  low: "#a87400", good: "#1a78b8", excellent: "#2f8a57", veryHigh: "#c2410c", tooMuch: "#c81e1e",
+  // Status colours (water, steps, diet bands). Darker than the dark-mode ones so they read on white;
+  // very high / too much are pulled apart (orange vs crimson) so they don't look alike. Always shown with a label too.
+  low: "#a87400", good: "#1a78b8", excellent: "#2f8a57", veryHigh: "#d9640a", tooMuch: "#b0124a",
 };
 
 const dark: typeof light = {

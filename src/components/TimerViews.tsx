@@ -66,6 +66,9 @@ export function BigTimer() {
   const last = t.status === "running" && t.left <= 5;
   const color = done ? c.accent : last ? c.warn : c.done;
   const progress = done ? 1 : Math.max(0, Math.min(1, t.left / t.total));
+  // Water reminders pause during the session; instead the big timer says "Sip water" for a minute every 15 min.
+  const elapsed = 3600 - t.session.left;
+  const sip = t.session.running && elapsed >= 900 && elapsed % 900 < 60;
   return (
     <Modal visible={t.bigVisible && t.status !== "idle"} animationType="fade" onRequestClose={t.minimizeBig} statusBarTranslucent>
       <Pressable style={{ flex: 1, backgroundColor: c.bg, alignItems: "center", justifyContent: "center", padding: 20, gap: 18 }} onPress={() => done && t.minimizeBig()}>
@@ -81,6 +84,7 @@ export function BigTimer() {
           </Text>
         </View>
         <T variant="muted" style={{ fontSize: 16, minHeight: 22, textAlign: "center" }}>{done ? "" : t.next}</T>
+        {sip ? <Text style={{ fontFamily: fonts.bodyBold, fontSize: 16, color: c.ink, borderWidth: 1.5, borderColor: c.good, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 6 }}>💧 Sip water</Text> : null}
         {!done ? (
           <View style={{ flexDirection: "row", gap: 10 }}>
             <Btn title="+15s" onPress={() => t.addTime(15)} style={{ paddingHorizontal: 20, paddingVertical: 12 }} />

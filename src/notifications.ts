@@ -133,3 +133,28 @@ export async function scheduleBackupReminder(enabled: boolean, lastBackup: strin
     trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: when, channelId: REMINDER_CHANNEL },
   });
 }
+
+export const WATER_CATEGORY = "water";
+export const WATER_ACTIONS = { add250: "water-add-250", add500: "water-add-500", snooze: "water-snooze" } as const;
+
+/**
+ * Buttons on water reminders. They all open the app, which logs the drink (or snoozes) as it starts:
+ * a button that doesn't open the app gets no JS callback at all when the app has been closed.
+ */
+export async function setupCategories() {
+  await Notifications.setNotificationCategoryAsync(WATER_CATEGORY, [
+    { identifier: WATER_ACTIONS.add250, buttonTitle: "+250 ml", options: { opensAppToForeground: true } },
+    { identifier: WATER_ACTIONS.add500, buttonTitle: "+500 ml", options: { opensAppToForeground: true } },
+    { identifier: WATER_ACTIONS.snooze, buttonTitle: "Snooze 30 min", options: { opensAppToForeground: true } },
+  ]);
+}
+
+/** Replace the one pending water reminder (null = none) */
+export async function scheduleWater(when: Date | null, title: string, body: string) {
+  await cancelKind("water");
+  if (!when || when.getTime() <= Date.now()) return;
+  await Notifications.scheduleNotificationAsync({
+    content: { title, body, data: { kind: "water" }, categoryIdentifier: WATER_CATEGORY },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: when, channelId: REMINDER_CHANNEL },
+  });
+}

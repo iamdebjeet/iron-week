@@ -84,7 +84,7 @@ export function MeScreen() {
             <Row icon="🎫" title="Entry passes" detail={passInfo} onPress={openManager} />
             <Row icon="📅" title="My week" detail={weekInfo} onPress={() => router.push("/week")} />
             <Row icon="🔔" title="Notifications" detail={prefs.reminders ? `Daily ${time12(prefs.hour, prefs.minute)}` : "Daily off"} onPress={() => router.push("/notifications")} />
-            <Row icon="🎯" title="Goals" soon />
+            <Row icon="🎯" title="Goals" detail={`Water ${prefs.water.baseGoalMl / 1000} L`} onPress={() => router.push("/goals")} />
             <Row icon="🎵" title="Music" detail="Spotify · YouTube Music" open={open === "music"} onPress={() => flip("music")}>
               <MusicButtons />
             </Row>

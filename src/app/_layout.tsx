@@ -17,7 +17,8 @@ import { ReloadProvider } from "../reload";
 import { StoreProvider, useStore } from "../store";
 import { TimerProvider } from "../timer";
 import { PassesProvider } from "../passes";
-import { scheduleReminders, scheduleSnack, setupChannels } from "../notifications";
+import { scheduleReminders, scheduleSnack, setupCategories, setupChannels } from "../notifications";
+import { WaterSync } from "../water";
 import type { PlanDay } from "../data/types";
 import { pickQuote } from "../logic/quotes";
 import { isQuiet } from "../logic/time";
@@ -32,7 +33,7 @@ function Root() {
   const scheme = useColorScheme();
   const [fontsLoaded] = useFonts({ Barlow_400Regular, Barlow_500Medium, Barlow_600SemiBold, BarlowCondensed_700Bold, BarlowCondensed_800ExtraBold });
   const show = ready && fontsLoaded;
-  useEffect(() => { setupChannels().catch(() => {}); }, []);
+  useEffect(() => { setupChannels().catch(() => {}); setupCategories().catch(() => {}); }, []);
   // Theme choice in Me overrides the phone's setting; useColorScheme() (and so useColors) follows it.
   useEffect(() => { if (ready) Appearance.setColorScheme(prefs.theme === "system" ? "auto" : prefs.theme); }, [ready, prefs.theme]);
   useEffect(() => { if (show) SplashScreen.hideAsync().catch(() => {}); }, [show]);
@@ -55,6 +56,7 @@ function Root() {
         <StatusBar style={scheme === "dark" ? "light" : "dark"} />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg } }} />
         <BigTimer />
+        <WaterSync />
       </PassesProvider>
     </TimerProvider>
   );

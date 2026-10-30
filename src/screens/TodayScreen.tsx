@@ -14,6 +14,7 @@ import { ExerciseCard, FinisherCard, StretchCard, SwimCard } from "../components
 import { MusclesWorked, WeeklyOverview } from "../components/Panels";
 import { SessionChip } from "../components/TimerViews";
 import { QuoteCard } from "../components/QuoteCard";
+import { WaterChip } from "../components/Water";
 import { useNow } from "../hooks/useNow";
 import { contextLine, pickQuote, type QuoteContext } from "../logic/quotes";
 import { isGymMode } from "../logic/time";
@@ -125,8 +126,13 @@ export function TodayScreen() {
           </View>
           <SessionChip />
         </View>
-        <View style={{ marginTop: 12 }}>
-          <QuoteCard quote={quote} context={contextLine(qctx)} saved={favQuotes.includes(quote.id)} onSave={() => toggleFavQuote(quote.id)} onAnother={nextQuote} slim={gymMode} />
+        {/* Gym mode: quote and water chip share one slim line so the workout fills the screen */}
+        <View style={gymMode ? { marginTop: 12, flexDirection: "row", gap: 8 } : { marginTop: 12, gap: 10 }}>
+          {gymMode ? <WaterChip slim /> : null}
+          <View style={{ flex: gymMode ? 1 : undefined }}>
+            <QuoteCard quote={quote} context={contextLine(qctx)} saved={favQuotes.includes(quote.id)} onSave={() => toggleFavQuote(quote.id)} onAnother={nextQuote} slim={gymMode} />
+          </View>
+          {gymMode ? null : <WaterChip />}
         </View>
 
         {/* Day tabs */}

@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { ScrollView, Switch, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { REMINDER_TIMES, timeLabel } from "../logic/plan";
+import { HALF_HOURS, REMINDER_TIMES, timeLabel } from "../logic/plan";
 import { isQuiet } from "../logic/time";
 import { ensurePermission, scheduleBackupReminder } from "../notifications";
 import { type Prefs, useStore } from "../store";
@@ -11,8 +11,6 @@ import { useColors } from "../theme";
 import { Btn, OptionPicker, T } from "../components/ui";
 
 type Toggle = "timerAlerts" | "reminders" | "waterReminders" | "passAlerts" | "snackReminder" | "backupReminder";
-/** Quiet-hours choices: every 30 min round the clock */
-const HALF_HOURS = Array.from({ length: 48 }, (_, i) => i * 30);
 
 export function NotificationsScreen() {
   const c = useColors();
@@ -65,7 +63,9 @@ export function NotificationsScreen() {
               {isQuiet(remindAt, prefs) ? <T variant="muted" style={{ color: c.warn }}>In quiet hours</T> : null}
             </View>
           ))}
-          {row("waterReminders", "Water reminders", "Nudges to drink, paused during gym and swim. They start when the water tracker arrives.")}
+          {row("waterReminders", "Water reminders", "Only when you forget to drink; paused during gym and swim.", (
+            <View style={{ flexDirection: "row" }}><Btn small title="Water reminder settings ›" onPress={() => router.push("/water-reminders")} /></View>
+          ))}
           {row("passAlerts", "Pass expiry", "2 days before your gym or swim pass runs out, at 10 AM.")}
           {row("snackReminder", "Pre-gym snack", `${timeLabel(Math.max(0, snackAt))} on gym days, 90 min before the gym.${isQuiet(snackAt, prefs) ? " (Skipped: in quiet hours.)" : ""}`)}
           {row("backupReminder", "Backup reminder", "Once a month: back up your Iron Week data.")}
