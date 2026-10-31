@@ -4,7 +4,10 @@ import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import type { PlanDay } from "./data/types";
 
-const TIMER_CHANNEL = "timers";
+// Android keeps a channel's sound settings once created, so the earlier "timers" channel (made with a
+// broken sound setting) is replaced by a new id and deleted.
+const TIMER_CHANNEL = "workout-timers";
+const OLD_TIMER_CHANNEL = "timers";
 const REMINDER_CHANNEL = "reminders";
 
 // While the app is open the timer screen already shows the alert, so play only the sound.
@@ -18,11 +21,12 @@ Notifications.setNotificationHandler({
 
 export async function setupChannels() {
   if (Platform.OS !== "android") return;
+  await Notifications.deleteNotificationChannelAsync(OLD_TIMER_CHANNEL).catch(() => {});
   await Notifications.setNotificationChannelAsync(TIMER_CHANNEL, {
     name: "Workout timers",
     importance: Notifications.AndroidImportance.HIGH,
     vibrationPattern: [0, 400, 200, 400],
-    sound: "default",
+    // No `sound`: on a channel it names a sound file in the app; leaving it out uses the phone's default sound.
   });
   await Notifications.setNotificationChannelAsync(REMINDER_CHANNEL, {
     name: "Daily reminders",
@@ -52,7 +56,7 @@ export async function scheduleStepAlerts(steps: { label: string; endsAt: number 
         content: {
           title: kind === "session" ? s.label : next ? `Next: ${next.label}` : "Time's up",
           body: kind === "session" ? "" : next ? `${s.label} done.` : `${s.label} done. Go!`,
-          sound: "default",
+          sound: true,
           data: { kind },
         },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds, channelId: TIMER_CHANNEL },
@@ -166,7 +170,7 @@ export async function scheduleWater(when: Date | null, title: string, body: stri
 export async function scheduleWalkAlerts(start: number, goalMin: number | null, brisk: boolean, switchSec: number) {
   await cancelKind("walk");
   const at = (ms: number, title: string, body: string) => Notifications.scheduleNotificationAsync({
-    content: { title, body, sound: "default", data: { kind: "walk" } },
+    content: { title, body, sound: true, data: { kind: "walk" } },
     trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(ms), channelId: TIMER_CHANNEL },
   });
   const end = start + (goalMin ?? 60) * 60_000;
@@ -178,4 +182,4 @@ export const cancelWalkAlerts = () => cancelKind("walk");
 
 /** Show a notification right now (e.g. a step goal reached while walking) */
 export const notifyNow = (title: string, body: string) =>
-  Notifications.scheduleNotificationAsync({ content: { title, body, sound: "default", data: { kind: "walk" } }, trigger: null });
+  Notifications.scheduleNotificationAsync({ content: { title, body, sound: true, data: { kind: "walk" } }, trigger: null });
