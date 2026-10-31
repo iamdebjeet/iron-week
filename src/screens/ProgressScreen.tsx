@@ -61,7 +61,7 @@ export function ProgressScreen() {
             </Pressable>
           </View>
           <View style={{ flexDirection: "row" }}>
-            {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => <Text key={i} style={{ flex: 1, textAlign: "center", fontFamily: fonts.bodyBold, fontSize: 11, color: c.muted }}>{d}</Text>)}
+            {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => <Text key={i} maxFontSizeMultiplier={1.4} style={{ flex: 1, textAlign: "center", fontFamily: fonts.bodyBold, fontSize: 11, color: c.muted }}>{d}</Text>)}
           </View>
           {grid.map((week, wi) => (
             <View key={wi} style={{ flexDirection: "row", gap: 4 }}>
@@ -73,7 +73,7 @@ export function ProgressScreen() {
                   <View key={d} accessible accessibilityLabel={`${shortDate(d)}: ${future ? "upcoming" : STATUS_WORDS[s]}`}
                     style={{ flex: 1, aspectRatio: 1, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: fill[s],
                       borderWidth: isToday ? 2 : 0, borderColor: c.ink, borderBottomWidth: s === "both" ? 4 : isToday ? 2 : 0, borderBottomColor: s === "both" ? c.pool : c.ink }}>
-                    <Text style={{ fontFamily: isToday ? fonts.bodyBold : fonts.bodyMedium, fontSize: 13, color: future ? c.muted : c.ink }}>{Number(d.slice(8))}</Text>
+                    <Text maxFontSizeMultiplier={1.4} style={{ fontFamily: isToday ? fonts.bodyBold : fonts.bodyMedium, fontSize: 13, color: future ? c.muted : c.ink }}>{Number(d.slice(8))}</Text>
                   </View>
                 );
               })}

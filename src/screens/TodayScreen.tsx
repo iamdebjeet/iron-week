@@ -156,8 +156,8 @@ export function TodayScreen() {
               <Pressable key={d.key} accessibilityRole="tab" accessibilityState={{ selected: sel }} accessibilityLabel={FULL_DAY[d.key]} onPress={() => setDayKey(d.key)}
                 style={{ flex: 1, alignItems: "center", paddingTop: 7, paddingBottom: 5, minHeight: 44, borderRadius: 8, borderWidth: 1,
                   borderColor: sel ? c.accent : c.line, backgroundColor: sel ? c.accent : c.surface, borderBottomWidth: swim ? 3 : 1, borderBottomColor: swim ? c.pool : sel ? c.accent : c.line }}>
-                <Text style={{ fontFamily: fonts.displayBold, fontSize: 15, color: sel ? c.accentInk : c.ink, textTransform: "uppercase" }}>{d.short}</Text>
-                <Text style={{ fontFamily: fonts.bodyMedium, fontSize: 9.5, color: sel ? c.accentInk : c.muted }} numberOfLines={1}>{d.rest ? (d.swim ? "Swim" : "Rest") : d.title.split(" · ")[0]}</Text>
+                <Text maxFontSizeMultiplier={1.4} style={{ fontFamily: fonts.displayBold, fontSize: 15, color: sel ? c.accentInk : c.ink, textTransform: "uppercase" }}>{d.short}</Text>
+                <Text maxFontSizeMultiplier={1.4} style={{ fontFamily: fonts.bodyMedium, fontSize: 9.5, color: sel ? c.accentInk : c.muted }} numberOfLines={1}>{d.rest ? (d.swim ? "Swim" : "Rest") : d.title.split(" · ")[0]}</Text>
               </Pressable>
             );
           })}

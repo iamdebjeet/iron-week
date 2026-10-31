@@ -65,7 +65,7 @@ export function TabBar({ state, descriptors, emitter, navigateToTab, insets }: B
             <Pressable key={route.key} onPress={onPress} accessibilityRole="tab" accessibilityState={{ selected: focused }} accessibilityLabel={tab.label}
               style={({ pressed }) => ({ flex: 1, alignItems: "center", paddingTop: 8, paddingBottom: 6, minHeight: 56, gap: 2, opacity: pressed ? 0.7 : 1 })}>
               <Icon name={tab.icon} color={color} />
-              <Text style={{ fontFamily: focused ? fonts.bodyBold : fonts.bodyMedium, fontSize: 11.5, color }}>{tab.label}</Text>
+              <Text maxFontSizeMultiplier={1.4} style={{ fontFamily: focused ? fonts.bodyBold : fonts.bodyMedium, fontSize: 11.5, color }}>{tab.label}</Text>
               <View style={{ width: 18, height: 2.5, borderRadius: 2, backgroundColor: focused ? c.accent : "transparent", marginTop: 1 }} />
             </Pressable>
           );

@@ -66,8 +66,8 @@ export function WeekPicker({ days, onChange }: { days: Record<DayKey, DayKind>; 
               accessibilityLabel={`${FULL_DAY[d]}: ${KIND_LABEL[k]}`} accessibilityHint="Tap to change"
               style={({ pressed }) => ({ flex: 1, minHeight: 52, alignItems: "center", justifyContent: "center", borderRadius: 8, borderWidth: 1.5, borderColor: l.border,
                 borderBottomWidth: l.under ? 4 : 1.5, borderBottomColor: l.under ?? l.border, backgroundColor: c.surface, opacity: pressed ? 0.7 : 1 })}>
-              <Text style={{ fontFamily: fonts.displayBold, fontSize: 15, textTransform: "uppercase", color: k === "rest" ? c.muted : c.ink }}>{FULL_DAY[d].slice(0, 3)}</Text>
-              <Text style={{ fontFamily: fonts.bodyMedium, fontSize: 9.5, color: l.text }} numberOfLines={1}>{k === "both" ? "Gym+Sw" : KIND_LABEL[k]}</Text>
+              <Text maxFontSizeMultiplier={1.4} style={{ fontFamily: fonts.displayBold, fontSize: 15, textTransform: "uppercase", color: k === "rest" ? c.muted : c.ink }}>{FULL_DAY[d].slice(0, 3)}</Text>
+              <Text maxFontSizeMultiplier={1.4} style={{ fontFamily: fonts.bodyMedium, fontSize: 9.5, color: l.text }} numberOfLines={1}>{k === "both" ? "Gym+Sw" : KIND_LABEL[k]}</Text>
             </Pressable>
           );
         })}

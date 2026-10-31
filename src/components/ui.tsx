@@ -24,12 +24,15 @@ export function Btn({ title, onPress, kind = "plain", style, small, color }: {
   const bg = kind === "primary" ? color ?? c.accent : kind === "danger" ? c.warn : c.bg;
   const fg = kind === "primary" ? (color ? "#fff" : c.accentInk) : kind === "danger" ? "#fff" : c.ink;
   return (
+    // Touch area ≥ 44 pt: full-size buttons are 44 tall; small ones get the rest as invisible hit slop.
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={title}
       onPress={onPress}
+      hitSlop={small ? 6 : 0}
       style={({ pressed }) => [
-        { backgroundColor: bg, borderColor: kind === "plain" ? c.line : bg, borderWidth: 1, borderRadius: 9,
-          paddingVertical: small ? 6 : 9, paddingHorizontal: small ? 10 : 13, opacity: pressed ? 0.7 : 1 },
+        { backgroundColor: bg, borderColor: kind === "plain" ? c.line : bg, borderWidth: 1, borderRadius: 9, justifyContent: "center",
+          minHeight: small ? 34 : 44, paddingVertical: small ? 6 : 9, paddingHorizontal: small ? 10 : 13, opacity: pressed ? 0.7 : 1 },
         style,
       ]}
     >
@@ -54,7 +57,8 @@ export function OptionPicker<V extends string | number>({ label, value, options,
         accessibilityRole="button"
         accessibilityLabel={label ? `${label}: ${value === null ? placeholder : format(value)}` : undefined}
         onPress={() => setOpen(true)}
-        style={{ flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: c.line, backgroundColor: c.bg, borderRadius: 8, paddingVertical: 5, paddingHorizontal: 9 }}
+        hitSlop={6}
+        style={{ flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: c.line, backgroundColor: c.bg, borderRadius: 8, minHeight: 34, paddingVertical: 5, paddingHorizontal: 9 }}
       >
         <Text style={{ color: c.ink, fontFamily: fonts.bodyBold, fontSize: 14 }}>{value === null ? placeholder : format(value)}</Text>
         <Text style={{ color: c.muted, fontSize: 10 }}>▼</Text>
@@ -65,7 +69,7 @@ export function OptionPicker<V extends string | number>({ label, value, options,
             {label ? <T variant="label" style={{ paddingHorizontal: 18, paddingVertical: 10 }}>{label}</T> : null}
             <ScrollView>
               {options.map((o) => (
-                <Pressable key={String(o)} onPress={() => { onChange(o); setOpen(false); }}
+                <Pressable key={String(o)} onPress={() => { onChange(o); setOpen(false); }} accessibilityRole="radio" accessibilityState={{ selected: o === value }}
                   style={({ pressed }) => ({ paddingVertical: 13, paddingHorizontal: 18, backgroundColor: o === value ? c.doneSoft : pressed ? c.bg : "transparent" })}>
                   <Text style={{ color: c.ink, fontFamily: o === value ? fonts.bodyBold : fonts.body, fontSize: 16 }}>{o === value ? "✓  " : ""}{format(o)}</Text>
                 </Pressable>
@@ -159,8 +163,8 @@ export function HowTo({ title = "How to do it", items }: { title?: string; items
 export function Check({ on, label, onPress, children }: { on: boolean; label: string; onPress: () => void; children?: React.ReactNode }) {
   const c = useColors();
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderColor: on ? c.done : c.line, backgroundColor: on ? c.done : "transparent", borderRadius: 8, paddingVertical: 5, paddingLeft: 10, paddingRight: children ? 6 : 10 }}>
-      <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: on }} accessibilityLabel={label} onPress={onPress} hitSlop={6}
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderColor: on ? c.done : c.line, backgroundColor: on ? c.done : "transparent", borderRadius: 8, minHeight: 44, paddingVertical: 5, paddingLeft: 10, paddingRight: children ? 6 : 10 }}>
+      <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: on }} accessibilityLabel={label} onPress={onPress} hitSlop={10}
         style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
         <View style={{ width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, borderColor: on ? "#fff" : c.muted, alignItems: "center", justifyContent: "center" }}>
           {on ? <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>✓</Text> : null}
