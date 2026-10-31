@@ -43,7 +43,7 @@ No account, no backend, no database: **everything stays on the phone**.
 
 **Progress**: streak, month calendar (gym / swim / both), personal records with the previous best, muscles this week.
 
-**Me**: profile + BMI, entry passes (PDF or photo, max brightness, expiry reminder), My week (days, times, workout order:
+**Me**: profile + BMI, **updates** (check, one-tap install, auto-install), entry passes (PDF or photo, max brightness, expiry reminder), My week (days, times, workout order:
 legs land on swim days), notifications + quiet hours, goals, music, saved quotes, **backup / restore**, theme, about.
 
 ## Run it
@@ -90,6 +90,34 @@ The `preview` profile builds a release APK for **arm64 only** (`reactNativeArchi
 current Android phones), with code minification and resource shrinking on (`expo-build-properties`). That keeps the
 download small. The exact size is shown on the build page when it finishes. `production` builds an `.aab` for the Play Store.
 
+## Updates
+
+The app checks for updates when it opens and from **Me → Updates**. There are two kinds:
+
+**Quick (over-the-air) updates** with EAS Update, for JS / screen / logic changes. `runtimeVersion` uses the
+`fingerprint` policy, so an update only reaches builds with the same native code.
+
+1. Set a short message in `app.json` → `expo.extra.updateMessage` (the app shows it in the update banner).
+2. Publish to the channel your build uses (`preview` APKs, `production` store builds):
+   ```bash
+   npx eas-cli@latest update --channel preview --message "Water chart fix"
+   ```
+
+On the phone: "✨ Update available" → **Update now** downloads it and restarts the app (never while a timer runs).
+With **Install updates automatically** on, it downloads in the background and applies when you leave the app.
+Quick updates work in installed release builds, not in Expo Go or a development build.
+
+**New APKs** for native changes (new packages, permissions, app.json native settings):
+
+1. Raise `expo.version` and `expo.android.versionCode` in `app.json`, then build: `npx eas-cli@latest build -p android --profile preview`.
+2. Edit [`latest.json`](latest.json) with the new `versionCode`, `version`, `notes` and the APK's `apkUrl` (https), and push it to `main`.
+
+The app reads `latest.json` from the URL in `app.json` → `expo.extra.latestJsonUrl`
+(this repo's raw GitHub file; the repo must be public for that). When its `versionCode` is higher than the installed
+build, the app shows **New version available: Download & install**, which opens the APK link.
+Installing over the app keeps all saved data (same signing key from EAS).
+
+
 ## Architecture
 
 ```mermaid
@@ -127,8 +155,8 @@ To change the training plan, edit `src/data/` (exercises, sets, reps, rest, stre
 ## Your data
 
 - Everything is saved **only on this phone** (AsyncStorage + app files). There is no account and no server.
-- Only two things use the internet: **looking up a scanned barcode** (Open Food Facts: only the barcode number is sent)
-  and **converting a pass PDF** to an image once (pdf.js from a CDN).
+- Only three things use the internet: **looking up a scanned barcode** (Open Food Facts: only the barcode number is sent),
+  **converting a pass PDF** to an image once (pdf.js from a CDN), and **checking for app updates** (EAS Update and ).
 - Health Connect is **read-only** (steps, active calories) and only after you allow it.
 - **Me → Backup / restore** saves everything to one file you keep (Drive, WhatsApp…), and restores it on a new phone.
 

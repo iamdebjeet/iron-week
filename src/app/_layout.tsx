@@ -22,6 +22,7 @@ import { WaterSync } from "../water";
 import { ToastProvider } from "../toast";
 import { DraftProvider } from "../diet";
 import { ActivityProvider } from "../activity";
+import { UpdatesProvider } from "../updates";
 import type { PlanDay } from "../data/types";
 import { pickQuote } from "../logic/quotes";
 import { isQuiet } from "../logic/time";
@@ -59,10 +60,12 @@ function Root() {
         <ToastProvider>
           <DraftProvider>
             <ActivityProvider>
-              <StatusBar style={scheme === "dark" ? "light" : "dark"} />
-              <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg } }} />
-              <BigTimer />
-              <WaterSync />
+              <UpdatesProvider>
+                <StatusBar style={scheme === "dark" ? "light" : "dark"} />
+                <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg } }} />
+                <BigTimer />
+                <WaterSync />
+              </UpdatesProvider>
             </ActivityProvider>
           </DraftProvider>
         </ToastProvider>

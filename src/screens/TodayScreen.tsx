@@ -21,6 +21,7 @@ import { contextLine, pickQuote, type QuoteContext } from "../logic/quotes";
 import { isGymMode } from "../logic/time";
 import { useProgress } from "../progress";
 import { WorkoutSummary } from "../components/WorkoutSummary";
+import { UpdateBanner } from "../components/UpdateBanner";
 import { Btn, T } from "../components/ui";
 
 type View3 = "workout" | "stretch" | "swim";
@@ -133,6 +134,8 @@ export function TodayScreen() {
           </View>
           <SessionChip />
         </View>
+        {gymMode ? null : <View style={{ marginTop: 12 }}><UpdateBanner /></View>}
+
         {/* Gym mode: quote and water chip share one slim line so the workout fills the screen */}
         <View style={gymMode ? { marginTop: 12, flexDirection: "row", gap: 8 } : { marginTop: 12, gap: 10 }}>
           {gymMode ? <WaterChip slim /> : null}

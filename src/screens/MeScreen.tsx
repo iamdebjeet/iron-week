@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FULL_DAY } from "../logic";
 import { EXPERIENCE_LABEL, GOAL_LABEL, bmi } from "../logic/profile";
 import { usePasses } from "../passes";
+import { useAppUpdates } from "../updates";
 import { type ThemePref, useStore } from "../store";
 import { fonts, useColors } from "../theme";
 import { MusicButtons } from "../components/Panels";
@@ -40,6 +41,7 @@ export function MeScreen() {
   const insets = useSafeAreaInsets();
   const { prefs, setPrefs, profile, plan, favQuotes } = useStore();
   const { passes, openManager } = usePasses();
+  const updates = useAppUpdates();
   const [open, setOpen] = useState<"music" | "theme" | "about" | null>(null);
   const flip = (k: typeof open) => setOpen((o) => (o === k ? null : k));
   const b = bmi(profile);
@@ -90,6 +92,7 @@ export function MeScreen() {
             </Row>
             <Row icon="❝" title="Saved quotes" detail={favQuotes.length ? `${favQuotes.length} saved` : "None yet"} onPress={() => router.push("/quotes")} />
             <Row icon="💾" title="Backup / restore" detail={prefs.lastBackup ? `Last: ${new Date(prefs.lastBackup).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : "Never"} onPress={() => router.push("/backup")} />
+            <Row icon="⬆️" title="Updates" detail={updates.ota || updates.apk ? "Update available" : `v${Constants.expoConfig?.version ?? ""}`} onPress={() => router.push("/updates")} />
             <Row icon="🌗" title="Theme" detail={THEMES.find((x) => x.key === prefs.theme)?.label} open={open === "theme"} onPress={() => flip("theme")}>
               <View style={{ flexDirection: "row", borderWidth: 1, borderColor: c.line, borderRadius: 10, overflow: "hidden" }}>
                 {THEMES.map((x) => {
@@ -104,7 +107,7 @@ export function MeScreen() {
               </View>
             </Row>
             <Row icon="ℹ️" title="About Iron Week" detail={`v${Constants.expoConfig?.version ?? "1.0.0"}`} open={open === "about"} onPress={() => flip("about")}>
-              <T variant="muted">Your gym and swim planner. Everything is saved only on this phone: no account, no server. Only two things use the internet: looking up a scanned barcode (Open Food Facts) and turning a pass PDF into an image.</T>
+              <T variant="muted">Your gym and swim planner. Everything is saved only on this phone: no account, no server. The internet is used only to look up a scanned barcode (Open Food Facts), turn a pass PDF into an image, and check for app updates.</T>
             </Row>
           </View>
         </View>

@@ -59,6 +59,8 @@ export interface Prefs {
   stepGoal: number;
   /** The Health Connect explanation was shown */
   healthAsked: boolean;
+  /** Download app updates quietly and apply them when you leave the app */
+  autoUpdate: boolean;
 }
 
 interface Store {
@@ -123,7 +125,7 @@ interface Store {
 const Ctx = createContext<Store | null>(null);
 const DEFAULT_PREFS: Prefs = { bigTimer: true, reminders: false, hour: 19, minute: 0, theme: "system", onboarded: false, waterReminders: true, lastBackup: null, backupReminder: false,
   timerAlerts: true, passAlerts: true, snackReminder: false, quietStart: 22 * 60 + 30, quietEnd: 7 * 60, water: DEFAULT_WATER,
-  startDate: null, lightWeekSeen: 0, stepGoal: DEFAULT_STEP_GOAL, healthAsked: false,
+  startDate: null, lightWeekSeen: 0, stepGoal: DEFAULT_STEP_GOAL, healthAsked: false, autoUpdate: false,
 };
 
 const totals = (diet: DietEntry[]) => {

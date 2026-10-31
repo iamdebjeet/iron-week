@@ -2,7 +2,7 @@
   "expo": {
     "name": "Iron Week",
     "slug": "iron-week",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -11,7 +11,8 @@
       "bundleIdentifier": "com.ironweek.app",
       "infoPlist": {
         "NSMotionUsageDescription": "Iron Week counts your steps during a walk."
-      }
+      },
+      "buildNumber": "2"
     },
     "android": {
       "package": "com.ironweek.app",
@@ -30,7 +31,8 @@
       "predictiveBackGestureEnabled": false,
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "versionCode": 2
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -84,12 +86,22 @@
     "extra": {
       "eas": {
         "projectId": "e23483e7-8545-481a-8b47-aff2e1b33331"
-      }
+      },
+      "updateMessage": "Iron Week 2.0: new tabs, water, diet, progress, steps and backups.",
+      "latestJsonUrl": "https://raw.githubusercontent.com/iamdebjeet/iron-week/main/latest.json"
     },
     "owner": "debjeetchakroborty",
     "scheme": "ironweek",
     "experiments": {
       "typedRoutes": true
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e23483e7-8545-481a-8b47-aff2e1b33331",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
     }
   }
 }
