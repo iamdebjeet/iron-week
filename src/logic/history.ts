@@ -84,8 +84,9 @@ export function previousDates(date: string, n: number): string[] {
 /** Minutes of gym, swim and stretching behind a day's calorie estimate */
 export function activeMinutes(args: { day: PlanDay; summary: DaySummary; ticks: Record<string, boolean>; stretchSetups: Record<string, StretchSetup>; sessionSec?: number }) {
   const { day, summary: s } = args;
-  // Gym: the session timer if it was used, else the planned hour once any set was ticked
-  const gymMin = (s.workout?.done ?? 0) > 0 ? (args.sessionSec ? args.sessionSec / 60 : 60) : 0;
+  // Gym: the session timer if it was used, else the 60-min hour scaled by the sets done (6 of 17 sets ≈ 21 min)
+  const w = s.workout;
+  const gymMin = !w?.done ? 0 : args.sessionSec ? args.sessionSec / 60 : (60 * w.done) / Math.max(1, w.total);
   const swimMin = SWIM_BLOCKS.reduce((a, b, j) => a + (args.ticks[`${day.key}W${j}`] ? b.minutes : 0), 0);
   const plannedStretch = groupMinutes([...STRETCH_PLANS[day.plan].w, ...STRETCH_PLANS[day.plan].c], args.stretchSetups);
   const stretchMin = s.stretch.total ? (plannedStretch * s.stretch.done) / s.stretch.total : 0;

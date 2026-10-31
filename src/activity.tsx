@@ -7,6 +7,9 @@ import { burnedToday, distanceKm, stepStatus, strideM } from "./logic/activity";
 import { activeMinutes } from "./logic/history";
 import { useProgress } from "./progress";
 import { useStore } from "./store";
+import { useTimer } from "./timer";
+
+const SESSION_SEC = 3600;
 
 interface Activity {
   status: HealthStatus | null;
@@ -66,14 +69,18 @@ export function useActivity() {
   if (!a) throw new Error("useActivity must be used inside ActivityProvider");
   const { steps, watchKcal, prefs, profile, walks, ticks, stretchSetups, sessionSec } = useStore();
   const { day, todaySummary } = useProgress();
+  const timer = useTimer();
   const stride = strideM(profile.heightCm, profile.gender);
-  const est = burnedToday({ weightKg: profile.weightKg, walks, ...activeMinutes({ day, summary: todaySummary, ticks, stretchSetups, sessionSec }) });
+  // Session time so far, live while the timer runs (the store only saves it on pause / end)
+  const liveSessionSec = Math.max(sessionSec, timer.session.left < SESSION_SEC ? SESSION_SEC - timer.session.left : 0);
+  const minutes = activeMinutes({ day, summary: todaySummary, ticks, stretchSetups, sessionSec: liveSessionSec });
+  const est = burnedToday({ weightKg: profile.weightKg, walks, ...minutes });
   return {
     ...a,
     steps, goal: prefs.stepGoal,
     stepStatus: stepStatus(steps ?? 0, prefs.stepGoal),
     km: distanceKm(steps ?? 0, stride), stride,
-    burned: est, watchKcal,
+    burned: est, minutes, watchKcal, workout: todaySummary.workout, stretch: todaySummary.stretch, walks,
     /** Prefer the watch's active calories when Health Connect has them */
     kcal: watchKcal ?? est.total, kcalSource: watchKcal !== null ? ("watch" as const) : ("estimate" as const),
   };
