@@ -156,7 +156,7 @@ To change the training plan, edit `src/data/` (exercises, sets, reps, rest, stre
 
 - Everything is saved **only on this phone** (AsyncStorage + app files). There is no account and no server.
 - Only three things use the internet: **looking up a scanned barcode** (Open Food Facts: only the barcode number is sent),
-  **converting a pass PDF** to an image once (pdf.js from a CDN), and **checking for app updates** (EAS Update and ).
+  **converting a pass PDF** to an image once (pdf.js from a CDN), and **checking for app updates** (EAS Update and `latest.json`).
 - Health Connect is **read-only** (steps, active calories) and only after you allow it.
 - **Me → Backup / restore** saves everything to one file you keep (Drive, WhatsApp…), and restores it on a new phone.
 
