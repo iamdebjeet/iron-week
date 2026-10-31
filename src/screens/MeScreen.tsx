@@ -5,7 +5,7 @@ import Constants from "expo-constants";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FULL_DAY } from "../logic";
-import { EXPERIENCE_LABEL, GOAL_LABEL, bmi } from "../logic/profile";
+import { BMI_LABEL, EXPERIENCE_LABEL, GOAL_LABEL, bmi, bmiCategory } from "../logic/profile";
 import { usePasses } from "../passes";
 import { useAppUpdates } from "../updates";
 import { type ThemePref, useStore } from "../store";
@@ -45,6 +45,9 @@ export function MeScreen() {
   const [open, setOpen] = useState<"music" | "theme" | "about" | null>(null);
   const flip = (k: typeof open) => setOpen((o) => (o === k ? null : k));
   const b = bmi(profile);
+  // BMI tile takes its band's status colour, with the band written underneath (colour is never the only cue)
+  const bmiCat = b !== null ? bmiCategory(b) : null;
+  const bmiColor = bmiCat ? { under: c.low, healthy: c.excellent, over: c.veryHigh, obese1: c.tooMuch, obese2: c.tooMuch, obese3: c.tooMuch }[bmiCat] : null;
   const stats: [string, string][] = [
     ["Age", profile.age ? String(profile.age) : "–"],
     ["cm", profile.heightCm ? String(profile.heightCm) : "–"],
@@ -71,13 +74,21 @@ export function MeScreen() {
           <Btn title="Edit" onPress={() => router.push("/welcome?edit=1")} />
         </View>
         <View style={{ flexDirection: "row", gap: 8 }}>
-          {stats.map(([label, value]) => (
-            <View key={label} accessible accessibilityLabel={`${label}: ${value}`}
-              style={{ flex: 1, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, borderRadius: 12, paddingVertical: 10, alignItems: "center" }}>
-              <Text style={{ fontFamily: fonts.display, fontSize: 24, color: c.ink }}>{value}</Text>
-              <T variant="label">{label}</T>
-            </View>
-          ))}
+          {stats.map(([label, value]) => {
+            const isBmi = label === "BMI" && bmiCat !== null && bmiColor !== null;
+            return (
+              <View key={label} accessible accessibilityLabel={`${label}: ${value}${isBmi ? `, ${BMI_LABEL[bmiCat]}` : ""}`}
+                style={{ flex: 1, backgroundColor: c.surface, borderWidth: isBmi ? 1.5 : 1, borderColor: isBmi ? bmiColor : c.line, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 2, alignItems: "center" }}>
+                <Text style={{ fontFamily: fonts.display, fontSize: 24, color: c.ink }}>{value}</Text>
+                <T variant="label">{label}</T>
+                {isBmi ? (
+                  <Text maxFontSizeMultiplier={1.3} numberOfLines={1} style={{ fontFamily: fonts.bodyBold, fontSize: 10.5, color: c.ink, marginTop: 2 }}>
+                    <Text style={{ color: bmiColor }}>● </Text>{BMI_LABEL[bmiCat]}
+                  </Text>
+                ) : null}
+              </View>
+            );
+          })}
         </View>
         {b !== null ? <T variant="muted" style={{ fontSize: 12, marginTop: -8 }}>BMI is a rough guide only; it doesn’t tell muscle from fat.</T> : null}
 

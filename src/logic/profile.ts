@@ -35,3 +35,12 @@ export function parseNum(s: string, min: number, max: number): number | null {
 /** Starting goals shown in the welcome setup (editable later in Goals) */
 export const BASE_WATER_L = 3;
 export const STEP_GOAL = 8000;
+
+export type BmiCategory = "under" | "healthy" | "over" | "obese1" | "obese2" | "obese3";
+export const BMI_LABEL: Record<BmiCategory, string> = {
+  under: "Underweight", healthy: "Healthy", over: "Overweight", obese1: "Obesity I", obese2: "Obesity II", obese3: "Obesity III",
+};
+/** WHO adult bands: < 18.5 · 18.5–24.9 · 25.0–29.9 · 30.0–34.9 · 35.0–39.9 · ≥ 40 (on the one-decimal BMI shown) */
+export function bmiCategory(b: number): BmiCategory {
+  return b < 18.5 ? "under" : b < 25 ? "healthy" : b < 30 ? "over" : b < 35 ? "obese1" : b < 40 ? "obese2" : "obese3";
+}
